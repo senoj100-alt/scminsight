@@ -74,14 +74,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SupplyRisk — Commodity Risk Intelligence" },
-      { name: "description", content: "AI-powered commodity supply-chain risk analysis, sourcing maps, price forecasts, and hedge recommendations." },
+      { title: "Supply Risk  Intelligence" },
+      { name: "description", content: "AI-powered supply-chain risk analysis, sourcing maps, price forecasts, and hedge recommendations." },
       { name: "author", content: "SupplyRisk" },
-      { property: "og:title", content: "SupplyRisk — Commodity Risk Intelligence" },
-      { property: "og:description", content: "AI-powered commodity supply-chain risk analysis." },
+      { property: "og:title", content: "Supply Risk  Intelligence" },
+      { property: "og:description", content: "AI-powered supply-chain risk analysis, sourcing maps, price forecasts, and hedge recommendations." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Supply Risk  Intelligence" },
+      { name: "twitter:description", content: "AI-powered supply-chain risk analysis, sourcing maps, price forecasts, and hedge recommendations." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d9040b61-1012-43b0-bcc2-763227391d87/id-preview-f614c164--49569f55-b456-4ba8-a51a-99d9e67f4a7b.lovable.app-1779412983428.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d9040b61-1012-43b0-bcc2-763227391d87/id-preview-f614c164--49569f55-b456-4ba8-a51a-99d9e67f4a7b.lovable.app-1779412983428.png" },
     ],
     links: [
       {
