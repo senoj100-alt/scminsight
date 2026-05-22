@@ -2,8 +2,10 @@ import { createFileRoute, Outlet, Link, useNavigate, useLocation } from "@tansta
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, History, LayoutDashboard, LogOut } from "lucide-react";
+import { ShieldAlert, History, LayoutDashboard, LogOut, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COUNTRY_OPTIONS, useUserCountry } from "@/lib/user-country";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
@@ -13,6 +15,7 @@ function AuthLayout() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { country, setCountry } = useUserCountry();
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
@@ -53,8 +56,27 @@ function AuthLayout() {
             <NavLink to="/dashboard" icon={LayoutDashboard}>Analyze</NavLink>
             <NavLink to="/history" icon={History}>History</NavLink>
           </nav>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-sm text-muted-foreground md:block">
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
+              <MapPin className="h-3.5 w-3.5 text-primary" /> Ship to
+            </div>
+            <Select
+              value={country.iso3}
+              onValueChange={(v) => {
+                const c = COUNTRY_OPTIONS.find((o) => o.iso3 === v);
+                if (c) setCountry(c);
+              }}
+            >
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRY_OPTIONS.map((o) => (
+                  <SelectItem key={o.iso3} value={o.iso3} className="text-xs">{o.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="hidden text-xs text-muted-foreground lg:block">
               {user.email}
             </div>
             <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate({ to: "/" }))}>

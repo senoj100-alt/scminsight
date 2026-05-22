@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ExternalLink, Globe2, Gauge, Building2, Sparkles, Network, Route as RouteIcon } from "lucide-react";
+import { ExternalLink, Globe2, Sparkles, Network, Route as RouteIcon, Activity, Newspaper, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { RiskMatrix } from "./RiskMatrix";
 import { SupplierNetwork } from "./SupplierNetwork";
+import { LogisticsView } from "./LogisticsView";
 import type { EntityData } from "@/lib/entity.functions";
 
 function riskColor(score: number) {
@@ -18,6 +19,8 @@ export function EntityReport({ entity }: { entity: EntityData }) {
 
   const goCountry = (country: string) =>
     navigate({ to: "/country/$name", params: { name: encodeURIComponent(country) } });
+  const goCompany = (company: string) =>
+    navigate({ to: "/company/$name", params: { name: encodeURIComponent(company) } });
 
   return (
     <div className="space-y-6">
@@ -91,6 +94,7 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           company={e.name}
           network={e.supplier_network}
           onNodeCountry={(country) => goCountry(country)}
+          onNodeCompany={(company) => goCompany(company)}
         />
       )}
 
@@ -109,6 +113,16 @@ export function EntityReport({ entity }: { entity: EntityData }) {
             ))}
           </ol>
         </div>
+      )}
+
+      {e.logistics && <LogisticsView logistics={e.logistics} />}
+
+      {e.kind === "company" && e.historical_performance && (
+        <PerformancePanel perf={e.historical_performance} />
+      )}
+
+      {e.kind === "company" && e.recent_news && e.recent_news.length > 0 && (
+        <NewsPanel news={e.recent_news} />
       )}
 
       {e.concentration_note && (
@@ -135,6 +149,78 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function PerformancePanel({ perf }: { perf: NonNullable<EntityData["historical_performance"]> }) {
+  const TrendIcon = perf.trend_12mo === "improving" ? TrendingUp : perf.trend_12mo === "deteriorating" ? TrendingDown : Minus;
+  const trendColor =
+    perf.trend_12mo === "improving" ? "oklch(0.72 0.17 145)" :
+    perf.trend_12mo === "deteriorating" ? "oklch(0.62 0.22 25)" :
+    "oklch(0.82 0.16 90)";
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <h3 className="mb-3 flex items-center gap-2 font-medium">
+        <Activity className="h-4 w-4 text-primary" /> Historical performance (last 12 months)
+      </h3>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Kpi label="On-time delivery" value={`${perf.on_time_delivery_pct.toFixed(1)}%`} />
+        <Kpi label="Avg. lead time" value={`${perf.lead_time_avg_days.toFixed(1)} d`} />
+        <Kpi label="Lead time variation" value={`±${perf.lead_time_variation_days.toFixed(1)} d`} />
+        <div className="rounded-md border border-border bg-background/40 p-3">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">12-mo trend</div>
+          <div className="mt-1.5 flex items-center gap-2 text-lg font-semibold" style={{ color: trendColor }}>
+            <TrendIcon className="h-4 w-4" /> {perf.trend_12mo}
+          </div>
+          {perf.fill_rate_pct != null && (
+            <div className="text-xs text-muted-foreground">Fill rate {perf.fill_rate_pct.toFixed(0)}%</div>
+          )}
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{perf.commentary}</p>
+    </div>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background/40 p-3">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1.5 text-lg font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function NewsPanel({ news }: { news: NonNullable<EntityData["recent_news"]> }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <h3 className="mb-3 flex items-center gap-2 font-medium">
+        <Newspaper className="h-4 w-4 text-primary" /> Latest supply-chain news
+      </h3>
+      <ul className="divide-y divide-border">
+        {news.map((n, i) => {
+          const tone =
+            n.sentiment === "negative" ? "oklch(0.62 0.22 25)" :
+            n.sentiment === "positive" ? "oklch(0.72 0.17 145)" :
+            "oklch(0.68 0.02 250)";
+          return (
+            <li key={i} className="py-3 first:pt-0 last:pb-0">
+              <a href={n.url} target="_blank" rel="noreferrer noopener" className="group flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-medium text-foreground group-hover:text-primary">{n.title}</div>
+                  <span className="shrink-0 text-xs" style={{ color: tone }}>{n.sentiment}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">{n.source} · {n.date}</div>
+                <p className="text-sm text-muted-foreground">{n.summary}</p>
+                <span className="inline-flex items-center gap-1 text-xs text-primary group-hover:underline">
+                  Read source <ExternalLink className="h-3 w-3" />
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
