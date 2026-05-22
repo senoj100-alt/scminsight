@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { generateEntity } from "@/lib/entity.functions";
 import { EntityReport } from "@/components/EntityReport";
+import { useUserCountry } from "@/lib/user-country";
 
 export const Route = createFileRoute("/_authenticated/company/$name")({
   component: CompanyPage,
@@ -13,9 +14,10 @@ function CompanyPage() {
   const { name } = Route.useParams();
   const company = decodeURIComponent(name);
   const fn = useServerFn(generateEntity);
+  const { country } = useUserCountry();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["entity", "company", company],
-    queryFn: () => fn({ data: { kind: "company", name: company } }),
+    queryKey: ["entity", "company", company, country.iso3],
+    queryFn: () => fn({ data: { kind: "company", name: company, userCountry: country } }),
     staleTime: 1000 * 60 * 10,
     retry: false,
   });
