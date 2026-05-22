@@ -349,15 +349,18 @@ const SCHEMA_PARAMETERS = {
 
 export const generateEntity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { kind: EntityKind; name: string }) =>
+  .inputValidator((d: { kind: EntityKind; name: string; userCountry?: { name: string; iso3: string } }) =>
     z.object({
       kind: z.enum(["company", "country", "industry"]),
       name: z.string().min(1).max(120),
+      userCountry: z.object({ name: z.string(), iso3: z.string() }).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+
+    const userCountry = data.userCountry ?? { name: "United States", iso3: "USA" };
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -366,7 +369,7 @@ export const generateEntity = createServerFn({ method: "POST" })
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: buildPrompt(data.kind, data.name) },
+          { role: "user", content: buildPrompt(data.kind, data.name, userCountry) },
         ],
         tools: [
           {
