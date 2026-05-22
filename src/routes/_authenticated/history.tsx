@@ -85,7 +85,7 @@ function HistoryPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <Link
-                        to={to}
+                        to={to as "/commodity/$name"}
                         params={{ name: encodeURIComponent(r.commodity) }}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary"
                       >
