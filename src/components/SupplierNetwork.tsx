@@ -13,10 +13,12 @@ export function SupplierNetwork({
   company,
   network,
   onNodeCountry,
+  onNodeCompany,
 }: {
   company: string;
   network: NonNullable<EntityData["supplier_network"]>;
   onNodeCountry?: (country: string) => void;
+  onNodeCompany?: (company: string) => void;
 }) {
   const layout = useMemo(() => {
     const byTier: Record<number, typeof network.nodes> = { 1: [], 2: [], 3: [] };
@@ -47,7 +49,7 @@ export function SupplierNetwork({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-medium">Supplier network · Tier 1 → 3</h3>
         <div className="text-xs text-muted-foreground">
-          Double-click a node to inspect its country
+          Click a supplier to open its company profile · double-click to open its country
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -114,7 +116,8 @@ export function SupplierNetwork({
               <g
                 key={n.id}
                 transform={`translate(${p.x},${p.y})`}
-                style={{ cursor: n.country ? "pointer" : "default" }}
+                style={{ cursor: "pointer" }}
+                onClick={() => onNodeCompany?.(n.name)}
                 onDoubleClick={() => n.country && onNodeCountry?.(n.country)}
               >
                 <circle r={r} fill={riskColor(n.risk)} stroke="oklch(0.96 0.01 250 / 0.6)" strokeWidth={1} />
