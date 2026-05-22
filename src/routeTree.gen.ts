@@ -14,6 +14,9 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedIndustryNameRouteImport } from './routes/_authenticated/industry.$name'
+import { Route as AuthenticatedCountryNameRouteImport } from './routes/_authenticated/country.$name'
+import { Route as AuthenticatedCompanyNameRouteImport } from './routes/_authenticated/company.$name'
 import { Route as AuthenticatedCommodityNameRouteImport } from './routes/_authenticated/commodity.$name'
 
 const LoginRoute = LoginRouteImport.update({
@@ -40,6 +43,24 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedIndustryNameRoute =
+  AuthenticatedIndustryNameRouteImport.update({
+    id: '/industry/$name',
+    path: '/industry/$name',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCountryNameRoute =
+  AuthenticatedCountryNameRouteImport.update({
+    id: '/country/$name',
+    path: '/country/$name',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCompanyNameRoute =
+  AuthenticatedCompanyNameRouteImport.update({
+    id: '/company/$name',
+    path: '/company/$name',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCommodityNameRoute =
   AuthenticatedCommodityNameRouteImport.update({
     id: '/commodity/$name',
@@ -53,6 +74,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
+  '/company/$name': typeof AuthenticatedCompanyNameRoute
+  '/country/$name': typeof AuthenticatedCountryNameRoute
+  '/industry/$name': typeof AuthenticatedIndustryNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -60,6 +84,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
+  '/company/$name': typeof AuthenticatedCompanyNameRoute
+  '/country/$name': typeof AuthenticatedCountryNameRoute
+  '/industry/$name': typeof AuthenticatedIndustryNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,12 +96,31 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/commodity/$name': typeof AuthenticatedCommodityNameRoute
+  '/_authenticated/company/$name': typeof AuthenticatedCompanyNameRoute
+  '/_authenticated/country/$name': typeof AuthenticatedCountryNameRoute
+  '/_authenticated/industry/$name': typeof AuthenticatedIndustryNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard' | '/history' | '/commodity/$name'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/history'
+    | '/commodity/$name'
+    | '/company/$name'
+    | '/country/$name'
+    | '/industry/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/history' | '/commodity/$name'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/history'
+    | '/commodity/$name'
+    | '/company/$name'
+    | '/country/$name'
+    | '/industry/$name'
   id:
     | '__root__'
     | '/'
@@ -83,6 +129,9 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
     | '/_authenticated/commodity/$name'
+    | '/_authenticated/company/$name'
+    | '/_authenticated/country/$name'
+    | '/_authenticated/industry/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -128,6 +177,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/industry/$name': {
+      id: '/_authenticated/industry/$name'
+      path: '/industry/$name'
+      fullPath: '/industry/$name'
+      preLoaderRoute: typeof AuthenticatedIndustryNameRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/country/$name': {
+      id: '/_authenticated/country/$name'
+      path: '/country/$name'
+      fullPath: '/country/$name'
+      preLoaderRoute: typeof AuthenticatedCountryNameRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/company/$name': {
+      id: '/_authenticated/company/$name'
+      path: '/company/$name'
+      fullPath: '/company/$name'
+      preLoaderRoute: typeof AuthenticatedCompanyNameRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/commodity/$name': {
       id: '/_authenticated/commodity/$name'
       path: '/commodity/$name'
@@ -142,12 +212,18 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedCommodityNameRoute: typeof AuthenticatedCommodityNameRoute
+  AuthenticatedCompanyNameRoute: typeof AuthenticatedCompanyNameRoute
+  AuthenticatedCountryNameRoute: typeof AuthenticatedCountryNameRoute
+  AuthenticatedIndustryNameRoute: typeof AuthenticatedIndustryNameRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedCommodityNameRoute: AuthenticatedCommodityNameRoute,
+  AuthenticatedCompanyNameRoute: AuthenticatedCompanyNameRoute,
+  AuthenticatedCountryNameRoute: AuthenticatedCountryNameRoute,
+  AuthenticatedIndustryNameRoute: AuthenticatedIndustryNameRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -162,3 +238,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
