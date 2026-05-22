@@ -113,7 +113,7 @@ const CATEGORY_SPECS: Record<EntityKind, string> = {
 - financial ("Financial risk"): metrics MUST include "Credit score / rating", "Debt-to-equity", "Days payable outstanding", "Recent revenue trend (YoY)".
 - reputational ("Reputational risk"): metrics MUST include "ESG score", "News sentiment (last 90d)", "Labor violation history", "Regulatory fines (last 24mo)".
 - structural ("Structural risk"): metrics MUST include "Single-source Tier 2/3 dependency", "Ownership / control changes", "Recent M&A activity", "Geographic concentration".
-ALSO populate countries_of_operation (5-12 countries the company sources from / operates in, with valid ISO3 and a short role e.g. "HQ", "Lithium refining", "Assembly"), supplier_network (10-18 nodes across tiers 1/2/3 with edges showing who supplies whom; the company itself is NOT a node — only suppliers), critical_path (4-7 step chain from raw material to finished product), and concentration_note.`,
+ALSO populate countries_of_operation (5-12 countries the company sources from / operates in, with valid ISO3 and a short role e.g. "HQ", "Lithium refining", "Assembly"), supplier_network (10-18 nodes across tiers 1/2/3 with edges showing who supplies whom; the company itself is NOT a node — only suppliers), critical_path (4-7 step chain from raw material to finished product), concentration_note, historical_performance (on-time delivery %, average lead time days, lead time variation in days, fill rate, 12-month trend, commentary), and recent_news (EXACTLY 5 of the latest credible supply-chain-related news items with real source name, real URL, ISO date within the last 6 months, short summary, and sentiment).`,
   country: `Return EXACTLY 3 categories with these keys/names:
 - disaster ("Disaster risk"): metrics MUST include "Natural disaster frequency", "Climate exposure score", "Pandemic readiness index", "Power outage rate".
 - geopolitical ("Geopolitical risk"): metrics MUST include "Trade tariff status", "Political stability index", "Sanctions watchlist status", "War/conflict proximity".
@@ -128,16 +128,33 @@ const SYSTEM = `You are a senior supply-chain risk intelligence analyst. Today i
 
 RISKS array: list 6-10 concrete risks. Each MUST set detectability ("easy" = observable from public signals / KPIs, "hard" = latent or low-visibility) and impact ("critical" = material to operations/finances, "non-critical" = manageable). This drives a 2x2 risk matrix; balance items across all four quadrants where realistic. Each risk must include a concrete action.`;
 
-function buildPrompt(kind: EntityKind, name: string) {
+function buildPrompt(kind: EntityKind, name: string, userCountry: { name: string; iso3: string }) {
   const subject =
     kind === "company"
       ? `the company "${name}"`
       : kind === "country"
       ? `the country / region "${name}"`
       : `the industry "${name}"`;
+
+  const logisticsSpec =
+    kind === "industry"
+      ? ""
+      : `\n\nLOGISTICS: Populate the "logistics" field for shipping from ${
+          kind === "company"
+            ? `the company's primary export hub`
+            : `${name}'s main export gateway`
+        } to the buyer in "${userCountry.name}" (${userCountry.iso3}).
+- destination MUST be { name: "${userCountry.name}", iso3: "${userCountry.iso3}" }.
+- Provide ALL THREE modes (air, sea, road). Mark "feasible": false (with brief notes) if a mode is impractical (e.g. road between two non-contiguous continents) but ALWAYS include it.
+- For each mode: realistic lead_time_days (min/typical/max), avg_cost as a human string with units (e.g. "$4.20–$6.80 / kg", "$2,800–$4,500 / 40ft container", "$0.18–$0.24 / km / tonne"), and a route array of 3-6 waypoints with real coordinates (origin → ports/airports/hubs/borders → destination).
+- risks per mode MUST cover 3-6 concrete current concerns: port congestion, war / conflict reroutes (Red Sea, Suez, Black Sea, Taiwan Strait, Panama drought), fuel cost trend, insurance / war-risk premium changes, customs delays, weather, labor strikes — whichever is realistically relevant for that lane in ${TODAY.slice(0,7)}.
+- alternative: suggest an alternative port / airport / corridor when applicable.
+- recommended_mode: pick the best mode given cost vs lead time vs risk for this lane today.`;
+
   return `Produce a complete supply-chain risk profile for ${subject} as of ${TODAY}.
 
 ${CATEGORY_SPECS[kind]}
+${logisticsSpec}
 
 overall_score must be a weighted aggregate of the category scores (0-100, higher = riskier). as_of MUST be ${TODAY}. Include 4-8 real, current sources.`;
 }
