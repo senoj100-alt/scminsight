@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { generateAnalysis, type AnalysisData } from "@/lib/analysis.functions";
@@ -97,7 +97,22 @@ function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }
           icon={Building2}
           label="Top-3 companies"
           value={`${a.concentration.top3_companies_pct.toFixed(0)}%`}
-          sub={a.concentration.top_companies.slice(0, 2).join(", ")}
+          subNode={
+            <span>
+              {a.concentration.top_companies.slice(0, 2).map((c, i) => (
+                <span key={c}>
+                  {i > 0 && ", "}
+                  <Link
+                    to="/company/$name"
+                    params={{ name: encodeURIComponent(c) }}
+                    className="hover:text-primary hover:underline"
+                  >
+                    {c}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          }
         />
       </div>
 
@@ -190,7 +205,14 @@ function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }
         )}
         <div className="mt-4 flex flex-wrap gap-2">
           {a.concentration.top_companies.map((c) => (
-            <span key={c} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">{c}</span>
+            <Link
+              key={c}
+              to="/company/$name"
+              params={{ name: encodeURIComponent(c) }}
+              className="rounded-full border border-border bg-muted px-3 py-1 text-xs transition-colors hover:border-primary hover:text-primary"
+            >
+              {c}
+            </Link>
           ))}
         </div>
       </div>
@@ -240,9 +262,9 @@ function RiskBadge({ score, label }: { score: number; label: string }) {
 }
 
 function Metric({
-  icon: Icon, label, value, sub, tone,
+  icon: Icon, label, value, sub, subNode, tone,
 }: {
-  icon: typeof Globe2; label: string; value: string; sub?: string; tone?: "good" | "warn";
+  icon: typeof Globe2; label: string; value: string; sub?: string; subNode?: React.ReactNode; tone?: "good" | "warn";
 }) {
   const c = tone === "good" ? "oklch(0.72 0.17 145)" : tone === "warn" ? "oklch(0.72 0.19 55)" : undefined;
   return (
@@ -251,7 +273,7 @@ function Metric({
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
       <div className="mt-2 text-2xl font-semibold tabular-nums" style={{ color: c }}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
+      {subNode ? <div className="mt-0.5 text-xs text-muted-foreground">{subNode}</div> : sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
     </div>
   );
 }
