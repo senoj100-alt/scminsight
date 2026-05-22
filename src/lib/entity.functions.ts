@@ -253,6 +253,85 @@ const SCHEMA_PARAMETERS = {
     },
     critical_path: { type: "array", items: { type: "string" } },
     concentration_note: { type: "string" },
+    historical_performance: {
+      type: "object",
+      properties: {
+        on_time_delivery_pct: { type: "number" },
+        lead_time_avg_days: { type: "number" },
+        lead_time_variation_days: { type: "number" },
+        fill_rate_pct: { type: "number" },
+        trend_12mo: { type: "string", enum: ["improving", "stable", "deteriorating"] },
+        commentary: { type: "string" },
+      },
+      required: ["on_time_delivery_pct", "lead_time_avg_days", "lead_time_variation_days", "trend_12mo", "commentary"],
+    },
+    recent_news: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          source: { type: "string" },
+          url: { type: "string" },
+          date: { type: "string" },
+          summary: { type: "string" },
+          sentiment: { type: "string", enum: ["positive", "neutral", "negative"] },
+        },
+        required: ["title", "source", "url", "date", "summary", "sentiment"],
+      },
+    },
+    logistics: {
+      type: "object",
+      properties: {
+        origin: {
+          type: "object",
+          properties: { name: { type: "string" }, iso3: { type: "string" } },
+          required: ["name", "iso3"],
+        },
+        destination: {
+          type: "object",
+          properties: { name: { type: "string" }, iso3: { type: "string" } },
+          required: ["name", "iso3"],
+        },
+        recommended_mode: { type: "string", enum: ["air", "road", "sea"] },
+        summary: { type: "string" },
+        modes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              mode: { type: "string", enum: ["air", "road", "sea"] },
+              feasible: { type: "boolean" },
+              lead_time_days: {
+                type: "object",
+                properties: { min: { type: "number" }, typical: { type: "number" }, max: { type: "number" } },
+                required: ["min", "typical", "max"],
+              },
+              avg_cost: { type: "string" },
+              route: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    iso3: { type: "string" },
+                    lat: { type: "number" },
+                    lng: { type: "number" },
+                    type: { type: "string", enum: ["origin", "port", "airport", "hub", "border", "destination"] },
+                  },
+                  required: ["name", "lat", "lng", "type"],
+                },
+              },
+              risks: { type: "array", items: { type: "string" } },
+              alternative: { type: "string" },
+              notes: { type: "string" },
+            },
+            required: ["mode", "feasible", "lead_time_days", "avg_cost", "route", "risks"],
+          },
+        },
+      },
+      required: ["origin", "destination", "recommended_mode", "summary", "modes"],
+    },
     sources: {
       type: "array",
       items: {
