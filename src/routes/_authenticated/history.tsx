@@ -50,16 +50,25 @@ function HistoryPage() {
           <table className="w-full">
             <thead className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Commodity</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Kind</th>
                 <th className="px-4 py-3">Risk</th>
                 <th className="px-4 py-3">Generated</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {data.map((r) => (
+              {data.map((r) => {
+                const kind = r.kind ?? "commodity";
+                const to =
+                  kind === "company" ? "/company/$name" :
+                  kind === "country" ? "/country/$name" :
+                  kind === "industry" ? "/industry/$name" :
+                  "/commodity/$name";
+                return (
                 <tr key={r.id} className="border-t border-border bg-card">
                   <td className="px-4 py-3 font-medium">{r.commodity}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground">{kind}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full px-2 py-0.5 text-xs" style={{
                       background: "oklch(0.3 0.03 250)",
@@ -76,7 +85,7 @@ function HistoryPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <Link
-                        to="/commodity/$name"
+                        to={to}
                         params={{ name: encodeURIComponent(r.commodity) }}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary"
                       >
@@ -91,7 +100,8 @@ function HistoryPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
