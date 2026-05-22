@@ -9,7 +9,7 @@ export const listHistory = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("analyses")
-      .select("id, commodity, created_at, data")
+      .select("id, commodity, created_at, data, kind")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
@@ -17,6 +17,7 @@ export const listHistory = createServerFn({ method: "GET" })
       id: r.id as string,
       commodity: r.commodity as string,
       created_at: r.created_at as string,
+      kind: ((r as { kind?: string }).kind ?? "commodity") as string,
       risk_score: (r.data as AnalysisData)?.risk_score ?? 0,
       risk_label: (r.data as AnalysisData)?.risk_label ?? "Moderate",
     }));

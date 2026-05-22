@@ -42,7 +42,8 @@ const AnalysisSchema = z.object({
 
 export type AnalysisData = z.infer<typeof AnalysisSchema>;
 
-const SYSTEM = `You are a senior commodities supply-chain risk analyst. Produce structured, defensible analysis. Use realistic recent figures (you may approximate where exact live data is unavailable, but be plausible). Cite real, well-known sources (USGS, IEA, World Bank, IMF, Reuters, Bloomberg, FAO, S&P Global, Wood Mackenzie, etc.) with real URLs. Country codes must be valid ISO 3-letter (e.g. CHN, USA, RUS, COD, AUS, CHL).`;
+const TODAY = new Date().toISOString().slice(0, 10);
+const SYSTEM = `You are a senior commodities supply-chain risk analyst. Today's date is ${TODAY}. ALL prices, figures, news context, and dates MUST reflect the most recent realistic market conditions as of ${TODAY} — never use stale 2022 or 2023 data. The price_history MUST end in the current month (${TODAY.slice(0,7)}) and span the prior 12 months. The forecast must cover the next 6 months starting after today. Use realistic recent figures (approximate when exact live data is unavailable, but stay plausible for the current period). Cite real, well-known sources (USGS, IEA, World Bank, IMF, Reuters, Bloomberg, FAO, S&P Global, Wood Mackenzie, etc.) with real URLs. Country codes must be valid ISO 3-letter (e.g. CHN, USA, RUS, COD, AUS, CHL).`;
 
 export const generateAnalysis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -53,9 +54,9 @@ export const generateAnalysis = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    const prompt = `Produce a complete supply-chain risk analysis for the commodity: "${data.commodity}".
+    const prompt = `Produce a complete supply-chain risk analysis for the commodity: "${data.commodity}" as of ${TODAY}.
 
-Return ALL fields. price_history: 12 monthly points ending this month. forecast: next 6 months. sourcing: 5-10 top producing countries with valid ISO3 codes and risk scores (0-100, higher = riskier). risk_score is overall global supply risk. recommendation: actionable for a procurement / treasury buyer.`;
+Return ALL fields. price_history: 12 monthly points ending in ${TODAY.slice(0,7)} (this month). forecast: next 6 months starting from the month AFTER ${TODAY.slice(0,7)}. current_price.as_of MUST be within the last 30 days of ${TODAY}. sourcing: 5-10 top producing countries with valid ISO3 codes and risk scores (0-100, higher = riskier). risk_score is overall global supply risk. recommendation: actionable for a procurement / treasury buyer. Reflect current geopolitical conditions, recent supply disruptions, and central-bank / OPEC / cartel actions known as of ${TODAY}.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -64,7 +65,7 @@ Return ALL fields. price_history: 12 monthly points ending this month. forecast:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: prompt },
