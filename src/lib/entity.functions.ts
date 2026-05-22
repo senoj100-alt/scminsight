@@ -38,6 +38,49 @@ const SupplierNodeSchema = z.object({
 });
 const SupplierEdgeSchema = z.object({ from: z.string(), to: z.string() });
 
+const WaypointSchema = z.object({
+  name: z.string(),
+  iso3: z.string().optional(),
+  lat: z.number(),
+  lng: z.number(),
+  type: z.enum(["origin", "port", "airport", "hub", "border", "destination"]),
+});
+const ModeSchema = z.object({
+  mode: z.enum(["air", "road", "sea"]),
+  feasible: z.boolean(),
+  lead_time_days: z.object({ min: z.number(), typical: z.number(), max: z.number() }),
+  avg_cost: z.string(),
+  route: z.array(WaypointSchema),
+  risks: z.array(z.string()).min(1),
+  alternative: z.string().optional(),
+  notes: z.string().optional(),
+});
+const LogisticsSchema = z.object({
+  origin: z.object({ name: z.string(), iso3: z.string() }),
+  destination: z.object({ name: z.string(), iso3: z.string() }),
+  recommended_mode: z.enum(["air", "road", "sea"]),
+  summary: z.string(),
+  modes: z.array(ModeSchema).min(1),
+});
+
+const PerformanceSchema = z.object({
+  on_time_delivery_pct: z.number().min(0).max(100),
+  lead_time_avg_days: z.number(),
+  lead_time_variation_days: z.number(),
+  fill_rate_pct: z.number().min(0).max(100).optional(),
+  trend_12mo: z.enum(["improving", "stable", "deteriorating"]),
+  commentary: z.string(),
+});
+
+const NewsItemSchema = z.object({
+  title: z.string(),
+  source: z.string(),
+  url: z.string(),
+  date: z.string(),
+  summary: z.string(),
+  sentiment: z.enum(["positive", "neutral", "negative"]),
+});
+
 const EntitySchema = z.object({
   name: z.string(),
   kind: z.enum(["company", "country", "industry"]),
@@ -56,6 +99,9 @@ const EntitySchema = z.object({
     .optional(),
   critical_path: z.array(z.string()).optional(),
   concentration_note: z.string().optional(),
+  historical_performance: PerformanceSchema.optional(),
+  recent_news: z.array(NewsItemSchema).optional(),
+  logistics: LogisticsSchema.optional(),
   sources: z.array(z.object({ title: z.string(), url: z.string() })),
 });
 
