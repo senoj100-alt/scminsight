@@ -4,9 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { generateAnalysis, type AnalysisData } from "@/lib/analysis.functions";
 import { WorldRiskMap } from "@/components/WorldRiskMap";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
+  ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from "recharts";
 import { Loader2, TrendingUp, TrendingDown, ExternalLink, Building2, Globe2, Gauge, Sparkles } from "lucide-react";
+import { useUserSettings } from "@/lib/user-settings";
+import { useState } from "react";
+import { Slider } from "@/components/ui/slider";
 
 export const Route = createFileRoute("/_authenticated/commodity/$name")({
   component: CommodityPage,
@@ -16,10 +19,11 @@ function CommodityPage() {
   const { name } = Route.useParams();
   const commodity = decodeURIComponent(name);
   const fn = useServerFn(generateAnalysis);
+  const { settings } = useUserSettings();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["analysis", commodity],
-    queryFn: () => fn({ data: { commodity } }),
+    queryKey: ["analysis", commodity, settings.userKey.provider, settings.userKey.key ? "byo" : "default"],
+    queryFn: () => fn({ data: { commodity, userKey: settings.userKey } }),
     staleTime: 1000 * 60 * 10,
     retry: false,
   });
@@ -52,13 +56,24 @@ function CommodityPage() {
 
 function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }) {
   const a = analysis;
+  const [shock, setShock] = useState(0); // -50..+50 supply shock %
+  const shockMul = 1 + shock / 100;
   const chartData = [
-    ...a.price_history.map((p) => ({ period: p.period, price: p.price, kind: "h" })),
-    ...a.forecast.map((p) => ({ period: p.period, price: p.price, kind: "f", forecast: p.price })),
+    ...a.price_history.map((p) => ({ period: p.period, price: p.price })),
+    ...a.forecast.map((p) => ({
+      period: p.period,
+      forecast: p.price * shockMul,
+      low: (p.low ?? p.price * 0.9) * shockMul,
+      high: (p.high ?? p.price * 1.1) * shockMul,
+      band: [
+        (p.low ?? p.price * 0.9) * shockMul,
+        (p.high ?? p.price * 1.1) * shockMul,
+      ],
+    })),
   ];
 
   const last = a.price_history.at(-1)?.price ?? 0;
-  const fcstEnd = a.forecast.at(-1)?.price ?? last;
+  const fcstEnd = (a.forecast.at(-1)?.price ?? last) * shockMul;
   const trend = fcstEnd - last;
   const trendPct = last ? (trend / last) * 100 : 0;
 
@@ -125,7 +140,7 @@ function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }
           <h3 className="mb-4 font-medium">Price trend & forecast</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.03 250)" />
                 <XAxis dataKey="period" stroke="oklch(0.68 0.02 250)" fontSize={11} />
                 <YAxis stroke="oklch(0.68 0.02 250)" fontSize={11} />
@@ -143,12 +158,22 @@ function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }
                   strokeDasharray="4 4"
                   label={{ value: "now", fill: "oklch(0.78 0.16 75)", fontSize: 10, position: "top" }}
                 />
+                <Area
+                  type="monotone"
+                  dataKey="band"
+                  stroke="none"
+                  fill="oklch(0.7 0.15 200)"
+                  fillOpacity={0.18}
+                  isAnimationActive={false}
+                  name="P10–P90 band"
+                />
                 <Line
                   type="monotone"
                   dataKey="price"
                   stroke="oklch(0.78 0.16 75)"
                   strokeWidth={2}
                   dot={false}
+                  name="History"
                 />
                 <Line
                   type="monotone"
@@ -157,9 +182,26 @@ function Report({ analysis }: { analysis: AnalysisData; regenerating?: boolean }
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
+                  name="Forecast (base)"
                 />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-4 rounded-md border border-border bg-background/40 p-3">
+            <div className="mb-1.5 flex items-center justify-between text-xs">
+              <span className="uppercase tracking-wider text-muted-foreground">What-if supply shock</span>
+              <span className="tabular-nums" style={{ color: shock === 0 ? undefined : shock > 0 ? "oklch(0.62 0.22 25)" : "oklch(0.72 0.17 145)" }}>
+                {shock > 0 ? "+" : ""}{shock}% {shock > 0 ? "(scarcity)" : shock < 0 ? "(surplus)" : "(baseline)"}
+              </span>
+            </div>
+            <Slider min={-50} max={50} step={5} value={[shock]} onValueChange={(v) => setShock(v[0])} />
+            {a.scenario_notes && (
+              <div className="mt-3 grid gap-2 text-xs md:grid-cols-3">
+                <div><span className="text-foreground font-medium">Base:</span> <span className="text-muted-foreground">{a.scenario_notes.base}</span></div>
+                <div><span className="font-medium" style={{ color: "oklch(0.72 0.17 145)" }}>Bull:</span> <span className="text-muted-foreground">{a.scenario_notes.bull}</span></div>
+                <div><span className="font-medium" style={{ color: "oklch(0.62 0.22 25)" }}>Bear:</span> <span className="text-muted-foreground">{a.scenario_notes.bear}</span></div>
+              </div>
+            )}
           </div>
         </div>
 

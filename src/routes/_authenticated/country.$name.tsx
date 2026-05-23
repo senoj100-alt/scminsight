@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { generateEntity } from "@/lib/entity.functions";
 import { EntityReport } from "@/components/EntityReport";
 import { useUserCountry } from "@/lib/user-country";
+import { useUserSettings } from "@/lib/user-settings";
 
 export const Route = createFileRoute("/_authenticated/country/$name")({
   component: CountryPage,
@@ -15,9 +16,10 @@ function CountryPage() {
   const country = decodeURIComponent(name);
   const fn = useServerFn(generateEntity);
   const { country: userCountry } = useUserCountry();
+  const { settings } = useUserSettings();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["entity", "country", country, userCountry.iso3],
-    queryFn: () => fn({ data: { kind: "country", name: country, userCountry } }),
+    queryKey: ["entity", "country", country, userCountry.iso3, settings.userKey.provider],
+    queryFn: () => fn({ data: { kind: "country", name: country, userCountry, userKey: settings.userKey } }),
     staleTime: 1000 * 60 * 10,
     retry: false,
   });

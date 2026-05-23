@@ -1,9 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { ExternalLink, Globe2, Sparkles, Network, Route as RouteIcon, Activity, Newspaper, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { RiskMatrix } from "./RiskMatrix";
 import { SupplierNetwork } from "./SupplierNetwork";
 import { LogisticsView } from "./LogisticsView";
+import { DisruptionSimulator } from "./DisruptionSimulator";
+import { PeerBenchmark } from "./PeerBenchmark";
 import type { EntityData } from "@/lib/entity.functions";
+import { applyWeights, labelForScore, useUserSettings } from "@/lib/user-settings";
 
 function riskColor(score: number) {
   if (score >= 75) return "oklch(0.62 0.22 25)";
@@ -14,8 +18,16 @@ function riskColor(score: number) {
 
 export function EntityReport({ entity }: { entity: EntityData }) {
   const navigate = useNavigate();
+  const { settings } = useUserSettings();
   const e = entity;
-  const color = riskColor(e.overall_score);
+  const weighted = useMemo(
+    () => applyWeights(e.categories.map((c) => ({ key: c.key, score: c.score })), settings.weights),
+    [e.categories, settings.weights]
+  );
+  const isCustom = weighted !== e.overall_score;
+  const displayScore = weighted;
+  const displayLabel = isCustom ? labelForScore(weighted) : e.overall_label;
+  const color = riskColor(displayScore);
 
   const goCountry = (country: string) =>
     navigate({ to: "/country/$name", params: { name: encodeURIComponent(country) } });
@@ -32,12 +44,17 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           <p className="mt-1 text-xs text-muted-foreground">As of {e.as_of}</p>
         </div>
         <div className="rounded-lg border border-border bg-card px-5 py-3 text-right">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Overall risk</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            Overall risk {isCustom && <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">custom weights</span>}
+          </div>
           <div className="mt-1 flex items-baseline justify-end gap-2">
-            <span className="text-3xl font-semibold tabular-nums" style={{ color }}>{e.overall_score}</span>
+            <span className="text-3xl font-semibold tabular-nums" style={{ color }}>{displayScore}</span>
             <span className="text-sm text-muted-foreground">/100</span>
           </div>
-          <div className="mt-0.5 text-xs font-medium" style={{ color }}>{e.overall_label}</div>
+          <div className="mt-0.5 text-xs font-medium" style={{ color }}>{displayLabel}</div>
+          {isCustom && (
+            <div className="mt-0.5 text-[10px] text-muted-foreground">unweighted {e.overall_score}</div>
+          )}
         </div>
       </header>
 
@@ -90,12 +107,15 @@ export function EntityReport({ entity }: { entity: EntityData }) {
       )}
 
       {e.kind === "company" && e.supplier_network && (
-        <SupplierNetwork
-          company={e.name}
-          network={e.supplier_network}
-          onNodeCountry={(country) => goCountry(country)}
-          onNodeCompany={(company) => goCompany(company)}
-        />
+        <>
+          <SupplierNetwork
+            company={e.name}
+            network={e.supplier_network}
+            onNodeCountry={(country) => goCountry(country)}
+            onNodeCompany={(company) => goCompany(company)}
+          />
+          <DisruptionSimulator network={e.supplier_network} />
+        </>
       )}
 
       {e.kind === "company" && e.critical_path && e.critical_path.length > 0 && (
@@ -116,6 +136,10 @@ export function EntityReport({ entity }: { entity: EntityData }) {
       )}
 
       {e.logistics && <LogisticsView logistics={e.logistics} />}
+
+      {e.kind === "company" && e.peer_benchmark && (
+        <PeerBenchmark benchmark={e.peer_benchmark} />
+      )}
 
       {e.kind === "company" && e.historical_performance && (
         <PerformancePanel perf={e.historical_performance} />
@@ -193,13 +217,29 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function NewsPanel({ news }: { news: NonNullable<EntityData["recent_news"]> }) {
+  const { settings } = useUserSettings();
+  const [filter, setFilter] = useState<"all" | "positive" | "neutral" | "negative">("all");
+  const filtered = (filter === "all" ? news : news.filter((n) => n.sentiment === filter)).slice(0, settings.newsCount);
   return (
     <div className="rounded-lg border border-border bg-card p-5">
-      <h3 className="mb-3 flex items-center gap-2 font-medium">
-        <Newspaper className="h-4 w-4 text-primary" /> Latest supply-chain news
-      </h3>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-medium">
+          <Newspaper className="h-4 w-4 text-primary" /> Latest supply-chain news
+        </h3>
+        <div className="flex gap-1 text-xs">
+          {(["all", "negative", "neutral", "positive"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full border px-2 py-0.5 ${filter === f ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
       <ul className="divide-y divide-border">
-        {news.map((n, i) => {
+        {filtered.map((n, i) => {
           const tone =
             n.sentiment === "negative" ? "oklch(0.62 0.22 25)" :
             n.sentiment === "positive" ? "oklch(0.72 0.17 145)" :
