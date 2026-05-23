@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { callAIStructured, currentDateAnchor, UserKeySchema } from "./ai-call.server";
 
 const AnalysisSchema = z.object({
   commodity: z.string(),
@@ -13,7 +14,21 @@ const AnalysisSchema = z.object({
     as_of: z.string(),
   }),
   price_history: z.array(z.object({ period: z.string(), price: z.number() })),
-  forecast: z.array(z.object({ period: z.string(), price: z.number() })),
+  forecast: z.array(
+    z.object({
+      period: z.string(),
+      price: z.number(),
+      low: z.number().optional(),
+      high: z.number().optional(),
+    })
+  ),
+  scenario_notes: z
+    .object({
+      base: z.string(),
+      bull: z.string(),
+      bear: z.string(),
+    })
+    .optional(),
   sourcing: z.array(
     z.object({
       country: z.string(),
@@ -42,41 +57,23 @@ const AnalysisSchema = z.object({
 
 export type AnalysisData = z.infer<typeof AnalysisSchema>;
 
-const TODAY = new Date().toISOString().slice(0, 10);
-const SYSTEM = `You are a senior commodities supply-chain risk analyst. Today's date is ${TODAY}. ALL prices, figures, news context, and dates MUST reflect the most recent realistic market conditions as of ${TODAY} — never use stale 2022 or 2023 data. The price_history MUST end in the current month (${TODAY.slice(0,7)}) and span the prior 12 months. The forecast must cover the next 6 months starting after today. Use realistic recent figures (approximate when exact live data is unavailable, but stay plausible for the current period). Cite real, well-known sources (USGS, IEA, World Bank, IMF, Reuters, Bloomberg, FAO, S&P Global, Wood Mackenzie, etc.) with real URLs. Country codes must be valid ISO 3-letter (e.g. CHN, USA, RUS, COD, AUS, CHL).`;
-
 export const generateAnalysis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { commodity: string }) =>
-    z.object({ commodity: z.string().min(1).max(80) }).parse(d)
+  .inputValidator((d: { commodity: string; userKey?: unknown }) =>
+    z.object({
+      commodity: z.string().min(1).max(80),
+      userKey: UserKeySchema,
+    }).parse(d)
   )
   .handler(async ({ data, context }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+    const date = currentDateAnchor();
+    const system = `You are a senior commodities supply-chain risk analyst. The current date is ${date.month} ${date.year} (${date.iso}). EVERY figure (prices, dates, news, geopolitical context) MUST reflect realistic market conditions in ${date.month} ${date.year}. NEVER use stale 2022/2023/2024 data and NEVER emit any year before ${date.year - 1}. The price_history MUST be 12 monthly points whose LAST period equals "${date.ym}" (${date.month} ${date.year}). The forecast MUST be 6 monthly points starting the month AFTER ${date.ym}. current_price.as_of MUST fall within the last 30 days of ${date.iso}. For the forecast, provide a base price plus a "low" (P10) and "high" (P90) confidence band reflecting realistic scenario uncertainty (weather, geopolitics, demand). Provide scenario_notes describing base / bull / bear narratives. Cite real sources (USGS, IEA, World Bank, IMF, Reuters, Bloomberg, FAO, S&P Global, Wood Mackenzie, FT, WSJ) with real URLs. Country codes must be valid ISO 3-letter codes.`;
 
-    const prompt = `Produce a complete supply-chain risk analysis for the commodity: "${data.commodity}" as of ${TODAY}.
+    const userPrompt = `Produce a complete supply-chain risk analysis for the commodity "${data.commodity}" as of ${date.month} ${date.year}.
 
-Return ALL fields. price_history: 12 monthly points ending in ${TODAY.slice(0,7)} (this month). forecast: next 6 months starting from the month AFTER ${TODAY.slice(0,7)}. current_price.as_of MUST be within the last 30 days of ${TODAY}. sourcing: 5-10 top producing countries with valid ISO3 codes and risk scores (0-100, higher = riskier). risk_score is overall global supply risk. recommendation: actionable for a procurement / treasury buyer. Reflect current geopolitical conditions, recent supply disruptions, and central-bank / OPEC / cartel actions known as of ${TODAY}.`;
+price_history: EXACTLY 12 monthly points, periods in YYYY-MM format, ending in "${date.ym}". forecast: EXACTLY 6 monthly points starting "${nextMonth(date.ym)}" with base price + low (P10) + high (P90). sourcing: 5-10 producing countries with ISO3 codes and risk scores (0-100). recommendation: actionable for a procurement/treasury buyer right now. Reflect known disruptions, central-bank policy, and trade actions as of ${date.month} ${date.year}.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: prompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "return_analysis",
-              description: "Return the structured commodity risk analysis",
-              parameters: {
+    const parameters = {
                 type: "object",
                 properties: {
                   commodity: { type: "string" },
@@ -104,9 +101,23 @@ Return ALL fields. price_history: 12 monthly points ending in ${TODAY.slice(0,7)
                     type: "array",
                     items: {
                       type: "object",
-                      properties: { period: { type: "string" }, price: { type: "number" } },
-                      required: ["period", "price"],
+                      properties: {
+                        period: { type: "string" },
+                        price: { type: "number" },
+                        low: { type: "number" },
+                        high: { type: "number" },
+                      },
+                      required: ["period", "price", "low", "high"],
                     },
+                  },
+                  scenario_notes: {
+                    type: "object",
+                    properties: {
+                      base: { type: "string" },
+                      bull: { type: "string" },
+                      bear: { type: "string" },
+                    },
+                    required: ["base", "bull", "bear"],
                   },
                   sourcing: {
                     type: "array",
@@ -158,24 +169,29 @@ Return ALL fields. price_history: 12 monthly points ending in ${TODAY.slice(0,7)
                   "price_history", "forecast", "sourcing", "concentration",
                   "short_term_risk", "long_term_risk", "recommendation", "sources",
                 ],
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "return_analysis" } },
-      }),
+    } as const;
+
+    const raw = await callAIStructured({
+      userKey: data.userKey,
+      system,
+      user: userPrompt,
+      toolName: "return_analysis",
+      toolDescription: "Return the structured commodity risk analysis",
+      parameters,
     });
+    const parsed = AnalysisSchema.parse(raw);
 
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limit exceeded. Try again shortly.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace settings.");
-      throw new Error(`AI gateway error ${res.status}`);
+    // Freshness guard: reject obviously stale price history (anything older than 2 years back)
+    const minYear = date.year - 2;
+    const stale = parsed.price_history.find((p) => {
+      const y = parseInt(p.period.slice(0, 4), 10);
+      return !isNaN(y) && y < minYear;
+    });
+    if (stale) {
+      throw new Error(
+        `AI returned stale data (${stale.period}). Try regenerating, switching to your own OpenAI/Anthropic key in Settings, or pick a more specific commodity name.`
+      );
     }
-
-    const json = await res.json();
-    const call = json.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call) throw new Error("No analysis returned");
-    const parsed = AnalysisSchema.parse(JSON.parse(call.function.arguments));
 
     // Save to history
     const { supabase, userId } = context;
@@ -188,3 +204,9 @@ Return ALL fields. price_history: 12 monthly points ending in ${TODAY.slice(0,7)
 
     return { analysis: parsed, id: saved?.id ?? null };
   });
+
+function nextMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, 1));
+  return d.toISOString().slice(0, 7);
+}

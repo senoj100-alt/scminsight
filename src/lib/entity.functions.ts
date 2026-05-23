@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { callAIStructured, currentDateAnchor, UserKeySchema } from "./ai-call.server";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -81,6 +82,21 @@ const NewsItemSchema = z.object({
   sentiment: z.enum(["positive", "neutral", "negative"]),
 });
 
+const PeerBenchmarkSchema = z.object({
+  industry: z.string(),
+  metrics: z.array(
+    z.object({
+      label: z.string(),
+      company: z.number(),
+      peer_median: z.number(),
+      top_quartile: z.number(),
+      unit: z.string().optional(),
+      higher_is_better: z.boolean(),
+    })
+  ),
+  commentary: z.string(),
+});
+
 const EntitySchema = z.object({
   name: z.string(),
   kind: z.enum(["company", "country", "industry"]),
@@ -101,6 +117,7 @@ const EntitySchema = z.object({
   concentration_note: z.string().optional(),
   historical_performance: PerformanceSchema.optional(),
   recent_news: z.array(NewsItemSchema).optional(),
+  peer_benchmark: PeerBenchmarkSchema.optional(),
   logistics: LogisticsSchema.optional(),
   sources: z.array(z.object({ title: z.string(), url: z.string() })),
 });
@@ -113,7 +130,7 @@ const CATEGORY_SPECS: Record<EntityKind, string> = {
 - financial ("Financial risk"): metrics MUST include "Credit score / rating", "Debt-to-equity", "Days payable outstanding", "Recent revenue trend (YoY)".
 - reputational ("Reputational risk"): metrics MUST include "ESG score", "News sentiment (last 90d)", "Labor violation history", "Regulatory fines (last 24mo)".
 - structural ("Structural risk"): metrics MUST include "Single-source Tier 2/3 dependency", "Ownership / control changes", "Recent M&A activity", "Geographic concentration".
-ALSO populate countries_of_operation (5-12 countries the company sources from / operates in, with valid ISO3 and a short role e.g. "HQ", "Lithium refining", "Assembly"), supplier_network (10-18 nodes across tiers 1/2/3 with edges showing who supplies whom; the company itself is NOT a node — only suppliers), critical_path (4-7 step chain from raw material to finished product), concentration_note, historical_performance (on-time delivery %, average lead time days, lead time variation in days, fill rate, 12-month trend, commentary), and recent_news (EXACTLY 5 of the latest credible supply-chain-related news items with real source name, real URL, ISO date within the last 6 months, short summary, and sentiment).`,
+ALSO populate countries_of_operation (5-12 countries the company sources from / operates in, with valid ISO3 and a short role e.g. "HQ", "Lithium refining", "Assembly"), supplier_network (10-18 nodes across tiers 1/2/3 with edges showing who supplies whom; the company itself is NOT a node — only suppliers), critical_path (4-7 step chain from raw material to finished product), concentration_note, historical_performance (on-time delivery %, average lead time days, lead time variation in days, fill rate, 12-month trend, commentary), recent_news (EXACTLY 10 of the latest credible supply-chain-related news items with real source name, real URL, ISO date within the last 6 months, short summary, and sentiment), AND peer_benchmark (industry name + 4-6 metrics comparing the company vs. peer-median vs. top-quartile: on-time delivery %, average lead time days, ESG score, debt-to-equity, gross margin %, days payable outstanding — pick whichever are most relevant; set higher_is_better correctly per metric).`,
   country: `Return EXACTLY 3 categories with these keys/names:
 - disaster ("Disaster risk"): metrics MUST include "Natural disaster frequency", "Climate exposure score", "Pandemic readiness index", "Power outage rate".
 - geopolitical ("Geopolitical risk"): metrics MUST include "Trade tariff status", "Political stability index", "Sanctions watchlist status", "War/conflict proximity".
@@ -124,7 +141,8 @@ Do NOT populate company-only fields (countries_of_operation, supplier_network, c
 Do NOT populate company-only fields.`,
 };
 
-const SYSTEM = `You are a senior supply-chain risk intelligence analyst. Today is ${TODAY}. Produce CURRENT, defensible analysis using realistic figures reflecting market conditions as of ${TODAY} — never stale 2022/2023 data. Cite real, well-known sources (S&P Global, Moody's, Reuters, Bloomberg, World Bank, IMF, OECD, MSCI ESG, RepRisk, Sustainalytics, EM-DAT, ND-GAIN, Fund for Peace FSI, OFAC, ACLED, FT, WSJ) with real URLs.
+const DATE = currentDateAnchor();
+const SYSTEM = `You are a senior supply-chain risk intelligence analyst. The current date is ${DATE.month} ${DATE.year} (${DATE.iso}). Produce CURRENT, defensible analysis using realistic figures reflecting market conditions in ${DATE.month} ${DATE.year}. NEVER emit any year before ${DATE.year - 1} for prices, KPIs, news dates, or performance windows. All "as_of" / "date" fields MUST fall within the last 6 months of ${DATE.iso}. Cite real, well-known sources (S&P Global, Moody's, Reuters, Bloomberg, World Bank, IMF, OECD, MSCI ESG, RepRisk, Sustainalytics, EM-DAT, ND-GAIN, Fund for Peace FSI, OFAC, ACLED, FT, WSJ) with real URLs.
 
 RISKS array: list 6-10 concrete risks. Each MUST set detectability ("easy" = observable from public signals / KPIs, "hard" = latent or low-visibility) and impact ("critical" = material to operations/finances, "non-critical" = manageable). This drives a 2x2 risk matrix; balance items across all four quadrants where realistic. Each risk must include a concrete action.`;
 
@@ -151,12 +169,12 @@ function buildPrompt(kind: EntityKind, name: string, userCountry: { name: string
 - alternative: suggest an alternative port / airport / corridor when applicable.
 - recommended_mode: pick the best mode given cost vs lead time vs risk for this lane today.`;
 
-  return `Produce a complete supply-chain risk profile for ${subject} as of ${TODAY}.
+  return `Produce a complete supply-chain risk profile for ${subject} as of ${DATE.month} ${DATE.year}.
 
 ${CATEGORY_SPECS[kind]}
 ${logisticsSpec}
 
-overall_score must be a weighted aggregate of the category scores (0-100, higher = riskier). as_of MUST be ${TODAY}. Include 4-8 real, current sources.`;
+overall_score must be a weighted aggregate of the category scores (0-100, higher = riskier). as_of MUST be ${DATE.iso}. Include 4-8 real, current sources.`;
 }
 
 const SCHEMA_PARAMETERS = {
@@ -280,6 +298,29 @@ const SCHEMA_PARAMETERS = {
         required: ["title", "source", "url", "date", "summary", "sentiment"],
       },
     },
+    peer_benchmark: {
+      type: "object",
+      properties: {
+        industry: { type: "string" },
+        metrics: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string" },
+              company: { type: "number" },
+              peer_median: { type: "number" },
+              top_quartile: { type: "number" },
+              unit: { type: "string" },
+              higher_is_better: { type: "boolean" },
+            },
+            required: ["label", "company", "peer_median", "top_quartile", "higher_is_better"],
+          },
+        },
+        commentary: { type: "string" },
+      },
+      required: ["industry", "metrics", "commentary"],
+    },
     logistics: {
       type: "object",
       properties: {
@@ -349,52 +390,33 @@ const SCHEMA_PARAMETERS = {
 
 export const generateEntity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { kind: EntityKind; name: string; userCountry?: { name: string; iso3: string } }) =>
+  .inputValidator((d: { kind: EntityKind; name: string; userCountry?: { name: string; iso3: string }; userKey?: unknown }) =>
     z.object({
       kind: z.enum(["company", "country", "industry"]),
       name: z.string().min(1).max(120),
       userCountry: z.object({ name: z.string(), iso3: z.string() }).optional(),
+      userKey: UserKeySchema,
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-
     const userCountry = data.userCountry ?? { name: "United States", iso3: "USA" };
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: buildPrompt(data.kind, data.name, userCountry) },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "return_entity",
-              description: "Return the structured entity risk profile",
-              parameters: SCHEMA_PARAMETERS,
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "return_entity" } },
-      }),
+    const raw = await callAIStructured({
+      userKey: data.userKey,
+      system: SYSTEM,
+      user: buildPrompt(data.kind, data.name, userCountry),
+      toolName: "return_entity",
+      toolDescription: "Return the structured entity risk profile",
+      parameters: SCHEMA_PARAMETERS,
     });
+    const parsed = EntitySchema.parse(raw);
 
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limit exceeded. Try again shortly.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace settings.");
-      throw new Error(`AI gateway error ${res.status}`);
+    // Freshness guard: as_of must not be in a year too far in the past
+    const asOfYear = parseInt(parsed.as_of.slice(0, 4), 10);
+    if (!isNaN(asOfYear) && asOfYear < DATE.year - 1) {
+      throw new Error(
+        `AI returned stale data (as_of=${parsed.as_of}). Try regenerating or switch to your own OpenAI/Anthropic key in Settings.`
+      );
     }
-
-    const json = await res.json();
-    const call = json.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call) throw new Error("No analysis returned");
-    const parsed = EntitySchema.parse(JSON.parse(call.function.arguments));
 
     const { supabase, userId } = context;
     const { data: saved } = await supabase
