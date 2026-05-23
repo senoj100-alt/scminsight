@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedIndustryNameRouteImport } from './routes/_authenticated/industry.$name'
@@ -32,6 +34,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPortfolioRoute = AuthenticatedPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   id: '/history',
@@ -73,6 +85,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/portfolio': typeof AuthenticatedPortfolioRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/company/$name': typeof AuthenticatedCompanyNameRoute
   '/country/$name': typeof AuthenticatedCountryNameRoute
@@ -83,6 +97,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/portfolio': typeof AuthenticatedPortfolioRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/company/$name': typeof AuthenticatedCompanyNameRoute
   '/country/$name': typeof AuthenticatedCountryNameRoute
@@ -95,6 +111,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/portfolio': typeof AuthenticatedPortfolioRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/_authenticated/company/$name': typeof AuthenticatedCompanyNameRoute
   '/_authenticated/country/$name': typeof AuthenticatedCountryNameRoute
@@ -107,6 +125,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/history'
+    | '/portfolio'
+    | '/settings'
     | '/commodity/$name'
     | '/company/$name'
     | '/country/$name'
@@ -117,6 +137,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/history'
+    | '/portfolio'
+    | '/settings'
     | '/commodity/$name'
     | '/company/$name'
     | '/country/$name'
@@ -128,6 +150,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
+    | '/_authenticated/portfolio'
+    | '/_authenticated/settings'
     | '/_authenticated/commodity/$name'
     | '/_authenticated/company/$name'
     | '/_authenticated/country/$name'
@@ -162,6 +186,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/portfolio': {
+      id: '/_authenticated/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof AuthenticatedPortfolioRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/history': {
       id: '/_authenticated/history'
@@ -211,6 +249,8 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedPortfolioRoute: typeof AuthenticatedPortfolioRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedCommodityNameRoute: typeof AuthenticatedCommodityNameRoute
   AuthenticatedCompanyNameRoute: typeof AuthenticatedCompanyNameRoute
   AuthenticatedCountryNameRoute: typeof AuthenticatedCountryNameRoute
@@ -220,6 +260,8 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedPortfolioRoute: AuthenticatedPortfolioRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedCommodityNameRoute: AuthenticatedCommodityNameRoute,
   AuthenticatedCompanyNameRoute: AuthenticatedCompanyNameRoute,
   AuthenticatedCountryNameRoute: AuthenticatedCountryNameRoute,
@@ -238,3 +280,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
