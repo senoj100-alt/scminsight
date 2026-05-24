@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { listHistory } from "@/lib/history.functions";
-import { LayoutGrid, AlertTriangle, ShieldCheck, ShieldAlert, Activity } from "lucide-react";
+import { LayoutGrid, AlertTriangle, ShieldCheck, ShieldAlert, Activity, LogIn } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/portfolio")({
   component: PortfolioPage,
@@ -23,8 +24,9 @@ function routeFor(kind: string) {
 }
 
 function PortfolioPage() {
+  const { user } = useAuth();
   const list = useServerFn(listHistory);
-  const { data, isLoading } = useQuery({ queryKey: ["history"], queryFn: () => list() });
+  const { data, isLoading } = useQuery({ queryKey: ["history"], queryFn: () => list(), enabled: !!user });
 
   const groups = ((data ?? []) as { id: string; commodity: string; kind: string; risk_score: number; risk_label: string; created_at: string }[]).reduce<Record<string, typeof data>>((acc, r) => {
     const k = r.kind ?? "commodity";
@@ -52,7 +54,14 @@ function PortfolioPage() {
         <Stat icon={ShieldCheck} label="Green (<35)" value={greenCount} tone="oklch(0.72 0.17 145)" />
       </div>
 
-      {isLoading ? (
+      {!user ? (
+        <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
+          <LogIn className="mx-auto h-8 w-8 text-muted-foreground" />
+          <div className="mt-3 font-medium">Sign in to build a portfolio</div>
+          <div className="mt-1 text-sm text-muted-foreground">Guest analyses are not tracked across sessions.</div>
+          <Link to="/login" className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">Sign in with Google</Link>
+        </div>
+      ) : isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !totalCount ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
