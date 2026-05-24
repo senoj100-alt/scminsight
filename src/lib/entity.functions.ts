@@ -417,17 +417,20 @@ export const generateEntity = createServerFn({ method: "POST" })
       );
     }
 
-    const { supabase, userId } = context;
-    const { data: saved } = await supabase
-      .from("analyses")
-      .insert({
-        user_id: userId,
-        commodity: parsed.name,
-        data: parsed,
-        kind: data.kind,
-      } as never)
-      .select("id")
-      .single();
-
-    return { entity: parsed, id: saved?.id ?? null };
+    const { supabase, userId } = await getOptionalUser();
+    let id: string | null = null;
+    if (supabase && userId) {
+      const { data: saved } = await supabase
+        .from("analyses")
+        .insert({
+          user_id: userId,
+          commodity: parsed.name,
+          data: parsed,
+          kind: data.kind,
+        } as never)
+        .select("id")
+        .single();
+      id = saved?.id ?? null;
+    }
+    return { entity: parsed, id };
   });
