@@ -1,8 +1,7 @@
 import { createFileRoute, Outlet, Link, useNavigate, useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, History, LayoutDashboard, LogOut, MapPin, LayoutGrid, Settings } from "lucide-react";
+import { ShieldAlert, History, LayoutDashboard, LogOut, MapPin, LayoutGrid, Settings, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COUNTRY_OPTIONS, useUserCountry } from "@/lib/user-country";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,11 +16,7 @@ function AuthLayout() {
   const location = useLocation();
   const { country, setCountry } = useUserCountry();
 
-  useEffect(() => {
-    if (!loading && !user) navigate({ to: "/login" });
-  }, [user, loading, navigate]);
-
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Loading…
@@ -78,14 +73,25 @@ function AuthLayout() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="hidden text-xs text-muted-foreground lg:block">
-              {user.email}
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate({ to: "/" }))}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {user ? (
+              <>
+                <div className="hidden text-xs text-muted-foreground lg:block">{user.email}</div>
+                <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate({ to: "/" }))}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => navigate({ to: "/login" })}>
+                <LogIn className="mr-1.5 h-3.5 w-3.5" /> Sign in to save
+              </Button>
+            )}
           </div>
         </div>
+        {!user && (
+          <div className="border-t border-border/60 bg-muted/40 px-6 py-1.5 text-center text-[11px] text-muted-foreground">
+            Guest mode — analyses run normally but won't be saved to History or Portfolio. <Link to="/login" className="text-primary hover:underline">Sign in</Link> to keep them.
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
         <Outlet />
