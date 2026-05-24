@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import type { EntityData } from "@/lib/entity.functions";
 
 function riskColor(score: number) {
@@ -20,6 +21,10 @@ export function SupplierNetwork({
   onNodeCountry?: (country: string) => void;
   onNodeCompany?: (company: string) => void;
 }) {
+  const [zoom, setZoom] = useState(1);
+  const [showGhosts, setShowGhosts] = useState(true);
+  const [showPulse, setShowPulse] = useState(true);
+
   const layout = useMemo(() => {
     const byTier: Record<number, typeof network.nodes> = { 1: [], 2: [], 3: [] };
     for (const n of network.nodes) byTier[n.tier]?.push(n);
@@ -48,17 +53,35 @@ export function SupplierNetwork({
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-medium">Supplier network · Tier 1 → 3</h3>
-        <div className="text-xs text-muted-foreground">
-          Click a supplier to open its company profile · double-click to open its country
+        <div className="flex items-center gap-2 text-xs">
+          <label className="flex items-center gap-1 text-muted-foreground">
+            <input type="checkbox" className="accent-primary" checked={showGhosts} onChange={(e) => setShowGhosts(e.target.checked)} /> alt suppliers
+          </label>
+          <label className="flex items-center gap-1 text-muted-foreground">
+            <input type="checkbox" className="accent-primary" checked={showPulse} onChange={(e) => setShowPulse(e.target.checked)} /> disruption pulse
+          </label>
+          <button className="rounded-md border border-border p-1 hover:border-primary" onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))} title="Zoom out"><ZoomOut className="h-3 w-3" /></button>
+          <button className="rounded-md border border-border p-1 hover:border-primary" onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))} title="Zoom in"><ZoomIn className="h-3 w-3" /></button>
+          <button className="rounded-md border border-border p-1 hover:border-primary" onClick={() => setZoom(1)} title="Reset"><RotateCcw className="h-3 w-3" /></button>
         </div>
       </div>
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           width="100%"
-          height={layout.height}
+          height={layout.height * zoom}
           style={{ minWidth: 720 }}
         >
+          <defs>
+            <radialGradient id="pulse-grad">
+              <stop offset="0%" stopColor="oklch(0.62 0.22 25 / 0.55)" />
+              <stop offset="100%" stopColor="oklch(0.62 0.22 25 / 0)" />
+            </radialGradient>
+          </defs>
+          <style>{`
+            @keyframes net-pulse { 0% { r: 8; opacity: 0.8 } 100% { r: 28; opacity: 0 } }
+            .pulse { animation: net-pulse 1.8s ease-out infinite; transform-origin: center; }
+          `}</style>
           {/* column headers */}
           {layout.cols.map((c) => (
             <text
@@ -112,6 +135,7 @@ export function SupplierNetwork({
             const p = layout.positions[n.id];
             if (!p) return null;
             const r = 8;
+            const altmanLabel = n.altman_z != null ? ` · Z ${n.altman_z.toFixed(1)}` : "";
             return (
               <g
                 key={n.id}
@@ -120,6 +144,9 @@ export function SupplierNetwork({
                 onClick={() => onNodeCompany?.(n.name)}
                 onDoubleClick={() => n.country && onNodeCountry?.(n.country)}
               >
+                {showPulse && n.risk >= 70 && (
+                  <circle className="pulse" r={r} fill="none" stroke="oklch(0.62 0.22 25)" strokeWidth={1.5} />
+                )}
                 <circle r={r} fill={riskColor(n.risk)} stroke="oklch(0.96 0.01 250 / 0.6)" strokeWidth={1} />
                 <text
                   x={p.tier === 1 ? -12 : 12}
@@ -129,8 +156,22 @@ export function SupplierNetwork({
                   fill="oklch(0.92 0.01 250)"
                 >
                   {n.name}
-                  {n.country ? ` · ${n.country}` : ""}
+                  {n.country ? ` · ${n.country}` : ""}{altmanLabel}
                 </text>
+                {showGhosts && n.alt_supplier && (
+                  <g transform={`translate(0, ${p.tier === 1 ? -18 : 18})`}>
+                    <circle r={5} fill="none" stroke="oklch(0.78 0.16 75 / 0.7)" strokeDasharray="2 2" />
+                    <text
+                      x={p.tier === 1 ? -10 : 10}
+                      y={3}
+                      textAnchor={p.tier === 1 ? "end" : "start"}
+                      fontSize="9"
+                      fill="oklch(0.78 0.16 75 / 0.85)"
+                    >
+                      alt: {n.alt_supplier}
+                    </text>
+                  </g>
+                )}
               </g>
             );
           })}
@@ -142,8 +183,9 @@ export function SupplierNetwork({
           </g>
         </svg>
       </div>
-      <div className="mt-3 text-xs text-muted-foreground">
-        Color = supplier risk score · circle size fixed for legibility
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>Color = supplier risk · pulse = high risk · dashed circle = ghost alternative supplier · Z = Altman Z-score</span>
+        <span>Click supplier for profile · double-click for country</span>
       </div>
     </div>
   );
