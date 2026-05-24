@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getOptionalUser } from "@/integrations/supabase/optional-auth.server";
 import { callAIStructured, currentDateAnchor, UserKeySchema } from "./ai-call.server";
 
 const AnalysisSchema = z.object({
@@ -58,14 +58,13 @@ const AnalysisSchema = z.object({
 export type AnalysisData = z.infer<typeof AnalysisSchema>;
 
 export const generateAnalysis = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { commodity: string; userKey?: unknown }) =>
     z.object({
       commodity: z.string().min(1).max(80),
       userKey: UserKeySchema,
     }).parse(d)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const date = currentDateAnchor();
     const system = `You are a senior commodities supply-chain risk analyst. The current date is ${date.month} ${date.year} (${date.iso}). EVERY figure (prices, dates, news, geopolitical context) MUST reflect realistic market conditions in ${date.month} ${date.year}. NEVER use stale 2022/2023/2024 data and NEVER emit any year before ${date.year - 1}. The price_history MUST be 12 monthly points whose LAST period equals "${date.ym}" (${date.month} ${date.year}). The forecast MUST be 6 monthly points starting the month AFTER ${date.ym}. current_price.as_of MUST fall within the last 30 days of ${date.iso}. For the forecast, provide a base price plus a "low" (P10) and "high" (P90) confidence band reflecting realistic scenario uncertainty (weather, geopolitics, demand). Provide scenario_notes describing base / bull / bear narratives. Cite real sources (USGS, IEA, World Bank, IMF, Reuters, Bloomberg, FAO, S&P Global, Wood Mackenzie, FT, WSJ) with real URLs. Country codes must be valid ISO 3-letter codes.`;
 
@@ -194,15 +193,18 @@ price_history: EXACTLY 12 monthly points, periods in YYYY-MM format, ending in "
     }
 
     // Save to history
-    const { supabase, userId } = context;
-    const { data: saved, error } = await supabase
-      .from("analyses")
-      .insert({ user_id: userId, commodity: parsed.commodity, data: parsed })
-      .select("id")
-      .single();
-    if (error) console.error("save error", error);
-
-    return { analysis: parsed, id: saved?.id ?? null };
+    const { supabase, userId } = await getOptionalUser();
+    let id: string | null = null;
+    if (supabase && userId) {
+      const { data: saved, error } = await supabase
+        .from("analyses")
+        .insert({ user_id: userId, commodity: parsed.commodity, data: parsed })
+        .select("id")
+        .single();
+      if (error) console.error("save error", error);
+      id = saved?.id ?? null;
+    }
+    return { analysis: parsed, id };
   });
 
 function nextMonth(ym: string): string {

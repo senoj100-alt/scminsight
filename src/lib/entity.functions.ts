@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getOptionalUser } from "@/integrations/supabase/optional-auth.server";
 import { callAIStructured, currentDateAnchor, UserKeySchema } from "./ai-call.server";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -389,7 +389,6 @@ const SCHEMA_PARAMETERS = {
 };
 
 export const generateEntity = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { kind: EntityKind; name: string; userCountry?: { name: string; iso3: string }; userKey?: unknown }) =>
     z.object({
       kind: z.enum(["company", "country", "industry"]),
@@ -398,7 +397,7 @@ export const generateEntity = createServerFn({ method: "POST" })
       userKey: UserKeySchema,
     }).parse(d)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const userCountry = data.userCountry ?? { name: "United States", iso3: "USA" };
     const raw = await callAIStructured({
       userKey: data.userKey,
