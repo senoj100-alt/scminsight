@@ -97,6 +97,36 @@ const PeerBenchmarkSchema = z.object({
   commentary: z.string(),
 });
 
+const EsgBreakdownSchema = z.object({
+  emissions: z.number().min(0).max(100),
+  labor: z.number().min(0).max(100),
+  governance: z.number().min(0).max(100),
+  water: z.number().min(0).max(100),
+  commentary: z.string(),
+  evidence: z.array(z.string()).optional(),
+});
+const FinancialHealthSchema = z.object({
+  altman_z: z.number(),
+  distress_probability_pct: z.number().min(0).max(100),
+  liquidity_score: z.number().min(0).max(100).optional(),
+  commentary: z.string(),
+});
+const SanctionsSchema = z.object({
+  status: z.enum(["clear", "watchlist", "sanctioned"]),
+  lists: z.array(z.string()),
+  last_checked: z.string(),
+  commentary: z.string(),
+});
+const ContractSchema = z.object({
+  supplier: z.string(),
+  expiry: z.string(),
+  moq: z.string().optional(),
+  payment_terms: z.string().optional(),
+  annual_value: z.string().optional(),
+  backup_supplier: z.string().optional(),
+  risk: z.enum(["low", "medium", "high"]),
+});
+
 const EntitySchema = z.object({
   name: z.string(),
   kind: z.enum(["company", "country", "industry"]),
@@ -105,13 +135,26 @@ const EntitySchema = z.object({
   overall_label: z.enum(["Low", "Moderate", "High", "Extreme"]),
   as_of: z.string(),
   categories: z.array(CategorySchema).min(1),
-  risks: z.array(RiskItemSchema).min(3),
+  risks: z.array(
+    RiskItemSchema.extend({
+      trend: z.enum(["improving", "stable", "worsening"]).optional(),
+    })
+  ).min(3),
   // company-only
   countries_of_operation: z
     .array(z.object({ country: z.string(), iso3: z.string(), role: z.string() }))
     .optional(),
   supplier_network: z
-    .object({ nodes: z.array(SupplierNodeSchema), edges: z.array(SupplierEdgeSchema) })
+    .object({
+      nodes: z.array(
+        SupplierNodeSchema.extend({
+          altman_z: z.number().optional(),
+          alt_supplier: z.string().optional(),
+          annual_spend_usd_m: z.number().optional(),
+        })
+      ),
+      edges: z.array(SupplierEdgeSchema),
+    })
     .optional(),
   critical_path: z.array(z.string()).optional(),
   concentration_note: z.string().optional(),
@@ -119,6 +162,10 @@ const EntitySchema = z.object({
   recent_news: z.array(NewsItemSchema).optional(),
   peer_benchmark: PeerBenchmarkSchema.optional(),
   logistics: LogisticsSchema.optional(),
+  esg_breakdown: EsgBreakdownSchema.optional(),
+  financial_health: FinancialHealthSchema.optional(),
+  sanctions: SanctionsSchema.optional(),
+  contracts: z.array(ContractSchema).optional(),
   sources: z.array(z.object({ title: z.string(), url: z.string() })),
 });
 
