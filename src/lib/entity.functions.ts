@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getOptionalUser } from "@/integrations/supabase/optional-auth.server";
 import { callAIStructured, currentDateAnchor, UserKeySchema } from "./ai-call.server";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -55,6 +55,7 @@ const ModeSchema = z.object({
   risks: z.array(z.string()).min(1),
   alternative: z.string().optional(),
   notes: z.string().optional(),
+  carbon_kg_co2_per_kg: z.number().optional(),
 });
 const LogisticsSchema = z.object({
   origin: z.object({ name: z.string(), iso3: z.string() }),
@@ -97,6 +98,36 @@ const PeerBenchmarkSchema = z.object({
   commentary: z.string(),
 });
 
+const EsgBreakdownSchema = z.object({
+  emissions: z.number().min(0).max(100),
+  labor: z.number().min(0).max(100),
+  governance: z.number().min(0).max(100),
+  water: z.number().min(0).max(100),
+  commentary: z.string(),
+  evidence: z.array(z.string()).optional(),
+});
+const FinancialHealthSchema = z.object({
+  altman_z: z.number(),
+  distress_probability_pct: z.number().min(0).max(100),
+  liquidity_score: z.number().min(0).max(100).optional(),
+  commentary: z.string(),
+});
+const SanctionsSchema = z.object({
+  status: z.enum(["clear", "watchlist", "sanctioned"]),
+  lists: z.array(z.string()),
+  last_checked: z.string(),
+  commentary: z.string(),
+});
+const ContractSchema = z.object({
+  supplier: z.string(),
+  expiry: z.string(),
+  moq: z.string().optional(),
+  payment_terms: z.string().optional(),
+  annual_value: z.string().optional(),
+  backup_supplier: z.string().optional(),
+  risk: z.enum(["low", "medium", "high"]),
+});
+
 const EntitySchema = z.object({
   name: z.string(),
   kind: z.enum(["company", "country", "industry"]),
@@ -105,13 +136,26 @@ const EntitySchema = z.object({
   overall_label: z.enum(["Low", "Moderate", "High", "Extreme"]),
   as_of: z.string(),
   categories: z.array(CategorySchema).min(1),
-  risks: z.array(RiskItemSchema).min(3),
+  risks: z.array(
+    RiskItemSchema.extend({
+      trend: z.enum(["improving", "stable", "worsening"]).optional(),
+    })
+  ).min(3),
   // company-only
   countries_of_operation: z
     .array(z.object({ country: z.string(), iso3: z.string(), role: z.string() }))
     .optional(),
   supplier_network: z
-    .object({ nodes: z.array(SupplierNodeSchema), edges: z.array(SupplierEdgeSchema) })
+    .object({
+      nodes: z.array(
+        SupplierNodeSchema.extend({
+          altman_z: z.number().optional(),
+          alt_supplier: z.string().optional(),
+          annual_spend_usd_m: z.number().optional(),
+        })
+      ),
+      edges: z.array(SupplierEdgeSchema),
+    })
     .optional(),
   critical_path: z.array(z.string()).optional(),
   concentration_note: z.string().optional(),
@@ -119,6 +163,10 @@ const EntitySchema = z.object({
   recent_news: z.array(NewsItemSchema).optional(),
   peer_benchmark: PeerBenchmarkSchema.optional(),
   logistics: LogisticsSchema.optional(),
+  esg_breakdown: EsgBreakdownSchema.optional(),
+  financial_health: FinancialHealthSchema.optional(),
+  sanctions: SanctionsSchema.optional(),
+  contracts: z.array(ContractSchema).optional(),
   sources: z.array(z.object({ title: z.string(), url: z.string() })),
 });
 
@@ -130,7 +178,7 @@ const CATEGORY_SPECS: Record<EntityKind, string> = {
 - financial ("Financial risk"): metrics MUST include "Credit score / rating", "Debt-to-equity", "Days payable outstanding", "Recent revenue trend (YoY)".
 - reputational ("Reputational risk"): metrics MUST include "ESG score", "News sentiment (last 90d)", "Labor violation history", "Regulatory fines (last 24mo)".
 - structural ("Structural risk"): metrics MUST include "Single-source Tier 2/3 dependency", "Ownership / control changes", "Recent M&A activity", "Geographic concentration".
-ALSO populate countries_of_operation (5-12 countries the company sources from / operates in, with valid ISO3 and a short role e.g. "HQ", "Lithium refining", "Assembly"), supplier_network (10-18 nodes across tiers 1/2/3 with edges showing who supplies whom; the company itself is NOT a node — only suppliers), critical_path (4-7 step chain from raw material to finished product), concentration_note, historical_performance (on-time delivery %, average lead time days, lead time variation in days, fill rate, 12-month trend, commentary), recent_news (EXACTLY 10 of the latest credible supply-chain-related news items with real source name, real URL, ISO date within the last 6 months, short summary, and sentiment), AND peer_benchmark (industry name + 4-6 metrics comparing the company vs. peer-median vs. top-quartile: on-time delivery %, average lead time days, ESG score, debt-to-equity, gross margin %, days payable outstanding — pick whichever are most relevant; set higher_is_better correctly per metric).`,
+ALSO populate countries_of_operation (5-12 countries), supplier_network (10-18 nodes across tiers 1/2/3 with edges; EACH NODE MUST INCLUDE altman_z (numeric, typical 1.0-4.5; <1.8 distressed, >3.0 safe), alt_supplier (name of a credible alternative supplier), annual_spend_usd_m (rough annual procurement spend in $M); the focal company itself is NOT a node), critical_path (4-7 step chain), concentration_note, historical_performance, recent_news (EXACTLY 10 latest credible items, ISO date within last 6 months, real URLs), peer_benchmark (industry + 6-8 metrics including on-time delivery %, average lead time days, ESG score, debt-to-equity, gross margin %, days payable outstanding, cash conversion cycle days, supplier diversity score 0-100), esg_breakdown (emissions, labor, governance, water — each 0-100 where higher = worse; plus commentary and 2-4 evidence bullets), financial_health (altman_z, distress_probability_pct 0-100, optional liquidity_score, commentary), sanctions (status one of "clear"/"watchlist"/"sanctioned", lists array e.g. ["OFAC SDN","EU Consolidated","UK OFSI"], last_checked ISO date in last 30 days, commentary), and contracts (4-8 supplier contracts: supplier name, expiry ISO date within next 24 months, MOQ string, payment_terms e.g. "Net 60", annual_value e.g. "$45M", backup_supplier, risk low/medium/high). EACH risk in the risks array MUST include a "trend" field: "improving" / "stable" / "worsening" reflecting the last 6 months.`,
   country: `Return EXACTLY 3 categories with these keys/names:
 - disaster ("Disaster risk"): metrics MUST include "Natural disaster frequency", "Climate exposure score", "Pandemic readiness index", "Power outage rate".
 - geopolitical ("Geopolitical risk"): metrics MUST include "Trade tariff status", "Political stability index", "Sanctions watchlist status", "War/conflict proximity".
@@ -223,6 +271,7 @@ const SCHEMA_PARAMETERS = {
           action: { type: "string" },
           owner: { type: "string" },
           sla: { type: "string" },
+          trend: { type: "string", enum: ["improving", "stable", "worsening"] },
         },
         required: ["title", "category", "detectability", "impact", "action"],
       },
@@ -254,6 +303,9 @@ const SCHEMA_PARAMETERS = {
               iso3: { type: "string" },
               risk: { type: "number" },
               category: { type: "string" },
+              altman_z: { type: "number" },
+              alt_supplier: { type: "string" },
+              annual_spend_usd_m: { type: "number" },
             },
             required: ["id", "name", "tier", "risk"],
           },
@@ -366,12 +418,61 @@ const SCHEMA_PARAMETERS = {
               risks: { type: "array", items: { type: "string" } },
               alternative: { type: "string" },
               notes: { type: "string" },
+              carbon_kg_co2_per_kg: { type: "number" },
             },
             required: ["mode", "feasible", "lead_time_days", "avg_cost", "route", "risks"],
           },
         },
       },
       required: ["origin", "destination", "recommended_mode", "summary", "modes"],
+    },
+    esg_breakdown: {
+      type: "object",
+      properties: {
+        emissions: { type: "number" },
+        labor: { type: "number" },
+        governance: { type: "number" },
+        water: { type: "number" },
+        commentary: { type: "string" },
+        evidence: { type: "array", items: { type: "string" } },
+      },
+      required: ["emissions", "labor", "governance", "water", "commentary"],
+    },
+    financial_health: {
+      type: "object",
+      properties: {
+        altman_z: { type: "number" },
+        distress_probability_pct: { type: "number" },
+        liquidity_score: { type: "number" },
+        commentary: { type: "string" },
+      },
+      required: ["altman_z", "distress_probability_pct", "commentary"],
+    },
+    sanctions: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["clear", "watchlist", "sanctioned"] },
+        lists: { type: "array", items: { type: "string" } },
+        last_checked: { type: "string" },
+        commentary: { type: "string" },
+      },
+      required: ["status", "lists", "last_checked", "commentary"],
+    },
+    contracts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          supplier: { type: "string" },
+          expiry: { type: "string" },
+          moq: { type: "string" },
+          payment_terms: { type: "string" },
+          annual_value: { type: "string" },
+          backup_supplier: { type: "string" },
+          risk: { type: "string", enum: ["low", "medium", "high"] },
+        },
+        required: ["supplier", "expiry", "risk"],
+      },
     },
     sources: {
       type: "array",
@@ -389,7 +490,6 @@ const SCHEMA_PARAMETERS = {
 };
 
 export const generateEntity = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { kind: EntityKind; name: string; userCountry?: { name: string; iso3: string }; userKey?: unknown }) =>
     z.object({
       kind: z.enum(["company", "country", "industry"]),
@@ -398,7 +498,7 @@ export const generateEntity = createServerFn({ method: "POST" })
       userKey: UserKeySchema,
     }).parse(d)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const userCountry = data.userCountry ?? { name: "United States", iso3: "USA" };
     const raw = await callAIStructured({
       userKey: data.userKey,
@@ -418,17 +518,20 @@ export const generateEntity = createServerFn({ method: "POST" })
       );
     }
 
-    const { supabase, userId } = context;
-    const { data: saved } = await supabase
-      .from("analyses")
-      .insert({
-        user_id: userId,
-        commodity: parsed.name,
-        data: parsed,
-        kind: data.kind,
-      } as never)
-      .select("id")
-      .single();
-
-    return { entity: parsed, id: saved?.id ?? null };
+    const { supabase, userId } = await getOptionalUser();
+    let id: string | null = null;
+    if (supabase && userId) {
+      const { data: saved } = await supabase
+        .from("analyses")
+        .insert({
+          user_id: userId,
+          commodity: parsed.name,
+          data: parsed,
+          kind: data.kind,
+        } as never)
+        .select("id")
+        .single();
+      id = saved?.id ?? null;
+    }
+    return { entity: parsed, id };
   });

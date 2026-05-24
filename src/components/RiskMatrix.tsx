@@ -1,4 +1,5 @@
 import type { EntityData } from "@/lib/entity.functions";
+import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 
 type Quadrant = "high" | "disruptive" | "manageable" | "limited";
 
@@ -101,11 +102,31 @@ function Cell({ q, risks }: { q: Quadrant; risks: EntityData["risks"] }) {
         {risks.length === 0 && <li className="text-xs text-muted-foreground/60">No items</li>}
         {risks.map((r, i) => (
           <li key={i} className="text-xs">
-            <div className="text-foreground">{r.title}</div>
+            <div className="flex items-center gap-1.5 text-foreground">
+              <span className="flex-1">{r.title}</span>
+              <TrendBadge trend={r.trend} />
+            </div>
             <div className="text-muted-foreground">{r.action}</div>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function TrendBadge({ trend }: { trend?: "improving" | "stable" | "worsening" }) {
+  if (!trend) return null;
+  const meta =
+    trend === "worsening" ? { Icon: TrendingUp, color: "oklch(0.62 0.22 25)", label: "↑" } :
+    trend === "improving" ? { Icon: TrendingDown, color: "oklch(0.72 0.17 145)", label: "↓" } :
+    { Icon: Minus, color: "oklch(0.68 0.02 250)", label: "—" };
+  return (
+    <span
+      title={`Trend: ${trend}`}
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full"
+      style={{ background: `${meta.color}26`, color: meta.color }}
+    >
+      <meta.Icon className="h-2.5 w-2.5" />
+    </span>
   );
 }

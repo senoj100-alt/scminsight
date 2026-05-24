@@ -6,6 +6,10 @@ import { SupplierNetwork } from "./SupplierNetwork";
 import { LogisticsView } from "./LogisticsView";
 import { DisruptionSimulator } from "./DisruptionSimulator";
 import { PeerBenchmark } from "./PeerBenchmark";
+import { EsgBreakdown } from "./EsgBreakdown";
+import { FinancialHealth } from "./FinancialHealth";
+import { SanctionsWatchlist } from "./SanctionsWatchlist";
+import { ContractsPanel } from "./ContractsPanel";
 import type { EntityData } from "@/lib/entity.functions";
 import { applyWeights, labelForScore, useUserSettings } from "@/lib/user-settings";
 
@@ -140,6 +144,11 @@ export function EntityReport({ entity }: { entity: EntityData }) {
       {e.kind === "company" && e.peer_benchmark && (
         <PeerBenchmark benchmark={e.peer_benchmark} />
       )}
+
+      {e.kind === "company" && e.financial_health && <FinancialHealth fh={e.financial_health} />}
+      {e.kind === "company" && e.esg_breakdown && <EsgBreakdown esg={e.esg_breakdown} />}
+      {e.sanctions && <SanctionsWatchlist s={e.sanctions} />}
+      {e.kind === "company" && e.contracts && e.contracts.length > 0 && <ContractsPanel contracts={e.contracts} />}
 
       {e.kind === "company" && e.historical_performance && (
         <PerformancePanel perf={e.historical_performance} />

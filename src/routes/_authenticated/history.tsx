@@ -2,14 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listHistory, deleteAnalysis } from "@/lib/history.functions";
-import { Trash2, ArrowRight, History as HistoryIcon } from "lucide-react";
+import { Trash2, ArrowRight, History as HistoryIcon, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
 });
 
 function HistoryPage() {
+  const { user } = useAuth();
   const list = useServerFn(listHistory);
   const del = useServerFn(deleteAnalysis);
   const qc = useQueryClient();
@@ -17,6 +19,7 @@ function HistoryPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["history"],
     queryFn: () => list(),
+    enabled: !!user,
   });
 
   const delMut = useMutation({
@@ -35,7 +38,18 @@ function HistoryPage() {
         <h1 className="mt-1 text-3xl font-semibold">Your analysis history</h1>
       </div>
 
-      {isLoading ? (
+      {!user ? (
+        <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
+          <LogIn className="mx-auto h-8 w-8 text-muted-foreground" />
+          <div className="mt-3 font-medium">Sign in to save your history</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            You're in guest mode — analyses run normally but aren't persisted.
+          </div>
+          <Link to="/login" className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+            Sign in with Google
+          </Link>
+        </div>
+      ) : isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !data?.length ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
