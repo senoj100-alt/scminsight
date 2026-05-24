@@ -55,6 +55,7 @@ const ModeSchema = z.object({
   risks: z.array(z.string()).min(1),
   alternative: z.string().optional(),
   notes: z.string().optional(),
+  carbon_kg_co2_per_kg: z.number().optional(),
 });
 const LogisticsSchema = z.object({
   origin: z.object({ name: z.string(), iso3: z.string() }),
