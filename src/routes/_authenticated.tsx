@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, History, LayoutDashboard, LogOut, MapPin, LayoutGrid, Settings, LogIn } from "lucide-react";
+import { ShieldAlert, History, LayoutDashboard, LogOut, MapPin, LayoutGrid, Settings, LogIn, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COUNTRY_OPTIONS, useUserCountry } from "@/lib/user-country";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +50,7 @@ function AuthLayout() {
           <nav className="flex items-center gap-1">
             <NavLink to="/dashboard" icon={LayoutDashboard}>Analyze</NavLink>
             <NavLink to="/portfolio" icon={LayoutGrid}>Portfolio</NavLink>
+            <NavLink to="/analytics" icon={BarChart3}>Analytics</NavLink>
             <NavLink to="/history" icon={History}>History</NavLink>
             <NavLink to="/settings" icon={Settings}>Settings</NavLink>
           </nav>
