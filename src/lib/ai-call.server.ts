@@ -1,14 +1,29 @@
 import { z } from "zod";
 
-export type AIProvider = "lovable" | "openai" | "anthropic";
+export type AIProvider =
+  | "lovable"
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "openrouter"
+  | "nvidia"
+  | "deepseek";
 
 export type UserKey = { provider: AIProvider; key?: string; model?: string } | undefined;
 
 export const UserKeySchema = z
   .object({
-    provider: z.enum(["lovable", "openai", "anthropic"]),
+    provider: z.enum([
+      "lovable",
+      "openai",
+      "anthropic",
+      "gemini",
+      "openrouter",
+      "nvidia",
+      "deepseek",
+    ]),
     key: z.string().min(10).max(400).optional(),
-    model: z.string().max(80).optional(),
+    model: z.string().max(120).optional(),
   })
   .optional();
 
@@ -16,6 +31,18 @@ const DEFAULT_MODELS: Record<AIProvider, string> = {
   lovable: "google/gemini-3-flash-preview",
   openai: "gpt-4o-mini",
   anthropic: "claude-3-5-sonnet-latest",
+  gemini: "gemini-2.5-flash",
+  openrouter: "anthropic/claude-3.5-sonnet",
+  nvidia: "meta/llama-3.1-70b-instruct",
+  deepseek: "deepseek-chat",
+};
+
+const OPENAI_COMPAT_BASE: Partial<Record<AIProvider, string>> = {
+  openai: "https://api.openai.com/v1/chat/completions",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  openrouter: "https://openrouter.ai/api/v1/chat/completions",
+  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/v1/chat/completions",
 };
 
 /**
@@ -61,11 +88,12 @@ export async function callAIStructured(opts: {
     return block.input;
   }
 
-  // OpenAI direct or Lovable gateway (both OpenAI-compatible)
+  // OpenAI-compatible providers (OpenAI, Gemini, OpenRouter, NVIDIA NIM, DeepSeek) + Lovable gateway
   let url: string;
   let auth: string;
-  if (provider === "openai" && userKey?.key) {
-    url = "https://api.openai.com/v1/chat/completions";
+  const compatUrl = OPENAI_COMPAT_BASE[provider];
+  if (compatUrl && userKey?.key) {
+    url = compatUrl;
     auth = `Bearer ${userKey.key}`;
   } else {
     const apiKey = process.env.LOVABLE_API_KEY;

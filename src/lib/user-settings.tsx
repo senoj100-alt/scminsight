@@ -1,12 +1,21 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-export type AIProvider = "lovable" | "openai" | "anthropic";
+export type AIProvider =
+  | "lovable"
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "openrouter"
+  | "nvidia"
+  | "deepseek";
 export type UserKey = { provider: AIProvider; key?: string; model?: string };
+export type ProviderEntry = { key?: string; model?: string };
 
 export type RiskWeights = Record<string, number>;
 
 export type UserSettings = {
   userKey: UserKey;
+  providers: Partial<Record<AIProvider, ProviderEntry>>;
   weights: RiskWeights; // keys: operational, financial, reputational, structural, disaster, geopolitical, fiscal, industry
   newsCount: number;
   scenarioShockPct: number; // -50..+50 supply-shock applied to commodity forecast
@@ -16,6 +25,7 @@ const KEY = "supplyrisk.settings.v1";
 
 const DEFAULTS: UserSettings = {
   userKey: { provider: "lovable" },
+  providers: {},
   weights: {
     operational: 1,
     financial: 1,
