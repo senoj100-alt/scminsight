@@ -67,6 +67,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
           ...parsed,
           weights: { ...DEFAULTS.weights, ...(parsed.weights ?? {}) },
           userKey: { ...DEFAULTS.userKey, ...(parsed.userKey ?? {}) },
+          providers: { ...(parsed.providers ?? {}) },
         });
       }
     } catch {}
