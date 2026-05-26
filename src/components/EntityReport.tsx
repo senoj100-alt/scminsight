@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ExternalLink, Globe2, Sparkles, Network, Route as RouteIcon, Activity, Newspaper, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ExternalLink, Globe2, Sparkles, Network, Route as RouteIcon, Activity, Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
 import { RiskMatrix } from "./RiskMatrix";
 import { SupplierNetwork } from "./SupplierNetwork";
 import { LogisticsView } from "./LogisticsView";
@@ -10,6 +10,12 @@ import { EsgBreakdown } from "./EsgBreakdown";
 import { FinancialHealth } from "./FinancialHealth";
 import { SanctionsWatchlist } from "./SanctionsWatchlist";
 import { ContractsPanel } from "./ContractsPanel";
+import { ScoreExplain } from "./ScoreExplain";
+import { MitigationEngine } from "./MitigationEngine";
+import { OpsPanel } from "./OpsPanel";
+import { AlertsManager } from "./AlertsManager";
+import { ProvenancePanel } from "./ProvenancePanel";
+import { EntityChat } from "./EntityChat";
 import type { EntityData } from "@/lib/entity.functions";
 import { applyWeights, labelForScore, useUserSettings } from "@/lib/user-settings";
 
@@ -20,10 +26,11 @@ function riskColor(score: number) {
   return "oklch(0.72 0.17 145)";
 }
 
-export function EntityReport({ entity }: { entity: EntityData }) {
+export function EntityReport({ entity, onRefresh, isRefreshing, lastFetchedAt }: { entity: EntityData; onRefresh?: () => void; isRefreshing?: boolean; lastFetchedAt?: number }) {
   const navigate = useNavigate();
   const { settings } = useUserSettings();
   const e = entity;
+  const entityKey = `${e.kind}:${e.name}`;
   const weighted = useMemo(
     () => applyWeights(e.categories.map((c) => ({ key: c.key, score: c.score })), settings.weights),
     [e.categories, settings.weights]
@@ -47,7 +54,19 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           <p className="mt-2 max-w-3xl text-muted-foreground">{e.overview}</p>
           <p className="mt-1 text-xs text-muted-foreground">As of {e.as_of}</p>
         </div>
-        <div className="rounded-lg border border-border bg-card px-5 py-3 text-right">
+        <div className="flex items-stretch gap-2">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs hover:border-primary hover:text-primary disabled:opacity-50"
+              title="Sync to latest date — regenerate this report with today's data"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              Sync to latest
+            </button>
+          )}
+          <div className="rounded-lg border border-border bg-card px-5 py-3 text-right">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">
             Overall risk {isCustom && <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">custom weights</span>}
           </div>
@@ -59,6 +78,7 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           {isCustom && (
             <div className="mt-0.5 text-[10px] text-muted-foreground">unweighted {e.overall_score}</div>
           )}
+          </div>
         </div>
       </header>
 
@@ -86,6 +106,12 @@ export function EntityReport({ entity }: { entity: EntityData }) {
       </div>
 
       <RiskMatrix risks={e.risks} />
+
+      <ScoreExplain entity={e} />
+      <ProvenancePanel entity={e} lastFetchedAt={lastFetchedAt ?? Date.now()} />
+      <AlertsManager entity={e} entityKey={entityKey} />
+      <MitigationEngine entity={e} entityKey={entityKey} />
+      <OpsPanel entity={e} entityKey={entityKey} />
 
       {e.kind === "company" && e.countries_of_operation && e.countries_of_operation.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-5">
@@ -182,6 +208,8 @@ export function EntityReport({ entity }: { entity: EntityData }) {
           ))}
         </ul>
       </div>
+
+      <EntityChat title={e.kind} context={JSON.stringify(e).slice(0, 30000)} />
     </div>
   );
 }
