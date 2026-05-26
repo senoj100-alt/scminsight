@@ -15,7 +15,7 @@ function IndustryPage() {
   const industry = decodeURIComponent(name);
   const fn = useServerFn(generateEntity);
   const { settings } = useUserSettings();
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["entity", "industry", industry, settings.userKey.provider],
     queryFn: () => fn({ data: { kind: "industry", name: industry, userKey: settings.userKey } }),
     staleTime: 1000 * 60 * 10,
@@ -40,5 +40,5 @@ function IndustryPage() {
     );
   }
   if (!data) return null;
-  return <EntityReport entity={data.entity} />;
+  return <EntityReport entity={data.entity} onRefresh={() => refetch()} isRefreshing={isFetching} lastFetchedAt={dataUpdatedAt} />;
 }
