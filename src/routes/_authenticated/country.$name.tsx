@@ -17,7 +17,7 @@ function CountryPage() {
   const fn = useServerFn(generateEntity);
   const { country: userCountry } = useUserCountry();
   const { settings } = useUserSettings();
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["entity", "country", country, userCountry.iso3, settings.userKey.provider],
     queryFn: () => fn({ data: { kind: "country", name: country, userCountry, userKey: settings.userKey } }),
     staleTime: 1000 * 60 * 10,
@@ -42,5 +42,5 @@ function CountryPage() {
     );
   }
   if (!data) return null;
-  return <EntityReport entity={data.entity} />;
+  return <EntityReport entity={data.entity} onRefresh={() => refetch()} isRefreshing={isFetching} lastFetchedAt={dataUpdatedAt} />;
 }
