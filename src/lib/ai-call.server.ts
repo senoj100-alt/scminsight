@@ -144,3 +144,59 @@ export function currentDateAnchor() {
     ym: d.toISOString().slice(0, 7),
   };
 }
+
+/** Plain chat completion (no tool calling). Returns assistant text. */
+export async function callAIText(opts: {
+  userKey?: UserKey;
+  system: string;
+  messages: { role: "user" | "assistant"; content: string }[];
+}): Promise<string> {
+  const { userKey, system, messages } = opts;
+  const provider: AIProvider = userKey?.provider ?? "lovable";
+  const model = userKey?.model || DEFAULT_MODELS[provider];
+
+  if (provider === "anthropic" && userKey?.key) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": userKey.key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ model, max_tokens: 1500, system, messages }),
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const j = await res.json();
+    const txt = (j.content as Array<{ type: string; text?: string }>)?.find((b) => b.type === "text")?.text;
+    return txt || "";
+  }
+
+  let url: string;
+  let auth: string;
+  const compatUrl = OPENAI_COMPAT_BASE[provider];
+  if (compatUrl && userKey?.key) {
+    url = compatUrl;
+    auth = `Bearer ${userKey.key}`;
+  } else {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+    url = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    auth = `Bearer ${apiKey}`;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: auth, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "system", content: system }, ...messages],
+    }),
+  });
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Rate limit exceeded. Try again shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add credits or use your own key in Settings.");
+    throw new Error(`${provider} gateway error ${res.status}`);
+  }
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content ?? "";
+}
