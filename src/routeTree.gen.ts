@@ -14,9 +14,13 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
+import { Route as AuthenticatedLanesRouteImport } from './routes/_authenticated/lanes'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
+import { Route as ApiPublicAlertDeliverRouteImport } from './routes/api/public/alert-deliver'
 import { Route as AuthenticatedIndustryNameRouteImport } from './routes/_authenticated/industry.$name'
 import { Route as AuthenticatedCountryNameRouteImport } from './routes/_authenticated/country.$name'
 import { Route as AuthenticatedCompanyNameRouteImport } from './routes/_authenticated/company.$name'
@@ -46,6 +50,11 @@ const AuthenticatedPortfolioRoute = AuthenticatedPortfolioRouteImport.update({
   path: '/portfolio',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLanesRoute = AuthenticatedLanesRouteImport.update({
+  id: '/lanes',
+  path: '/lanes',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -56,10 +65,25 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedBacktestRoute = AuthenticatedBacktestRouteImport.update({
+  id: '/backtest',
+  path: '/backtest',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiPublicAlertDeliverRoute = ApiPublicAlertDeliverRouteImport.update({
+  id: '/api/public/alert-deliver',
+  path: '/api/public/alert-deliver',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndustryNameRoute =
   AuthenticatedIndustryNameRouteImport.update({
@@ -89,91 +113,116 @@ const AuthenticatedCommodityNameRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/alerts': typeof AuthenticatedAlertsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/lanes': typeof AuthenticatedLanesRoute
   '/portfolio': typeof AuthenticatedPortfolioRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/company/$name': typeof AuthenticatedCompanyNameRoute
   '/country/$name': typeof AuthenticatedCountryNameRoute
   '/industry/$name': typeof AuthenticatedIndustryNameRoute
+  '/api/public/alert-deliver': typeof ApiPublicAlertDeliverRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/alerts': typeof AuthenticatedAlertsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/lanes': typeof AuthenticatedLanesRoute
   '/portfolio': typeof AuthenticatedPortfolioRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/company/$name': typeof AuthenticatedCompanyNameRoute
   '/country/$name': typeof AuthenticatedCountryNameRoute
   '/industry/$name': typeof AuthenticatedIndustryNameRoute
+  '/api/public/alert-deliver': typeof ApiPublicAlertDeliverRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
+  '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/lanes': typeof AuthenticatedLanesRoute
   '/_authenticated/portfolio': typeof AuthenticatedPortfolioRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/commodity/$name': typeof AuthenticatedCommodityNameRoute
   '/_authenticated/company/$name': typeof AuthenticatedCompanyNameRoute
   '/_authenticated/country/$name': typeof AuthenticatedCountryNameRoute
   '/_authenticated/industry/$name': typeof AuthenticatedIndustryNameRoute
+  '/api/public/alert-deliver': typeof ApiPublicAlertDeliverRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
+    | '/alerts'
     | '/analytics'
+    | '/backtest'
     | '/dashboard'
     | '/history'
+    | '/lanes'
     | '/portfolio'
     | '/settings'
     | '/commodity/$name'
     | '/company/$name'
     | '/country/$name'
     | '/industry/$name'
+    | '/api/public/alert-deliver'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/alerts'
     | '/analytics'
+    | '/backtest'
     | '/dashboard'
     | '/history'
+    | '/lanes'
     | '/portfolio'
     | '/settings'
     | '/commodity/$name'
     | '/company/$name'
     | '/country/$name'
     | '/industry/$name'
+    | '/api/public/alert-deliver'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/alerts'
     | '/_authenticated/analytics'
+    | '/_authenticated/backtest'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
+    | '/_authenticated/lanes'
     | '/_authenticated/portfolio'
     | '/_authenticated/settings'
     | '/_authenticated/commodity/$name'
     | '/_authenticated/company/$name'
     | '/_authenticated/country/$name'
     | '/_authenticated/industry/$name'
+    | '/api/public/alert-deliver'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicAlertDeliverRoute: typeof ApiPublicAlertDeliverRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -213,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortfolioRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/lanes': {
+      id: '/_authenticated/lanes'
+      path: '/lanes'
+      fullPath: '/lanes'
+      preLoaderRoute: typeof AuthenticatedLanesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/history': {
       id: '/_authenticated/history'
       path: '/history'
@@ -227,12 +283,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/backtest': {
+      id: '/_authenticated/backtest'
+      path: '/backtest'
+      fullPath: '/backtest'
+      preLoaderRoute: typeof AuthenticatedBacktestRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/analytics': {
       id: '/_authenticated/analytics'
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/alerts': {
+      id: '/_authenticated/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AuthenticatedAlertsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/public/alert-deliver': {
+      id: '/api/public/alert-deliver'
+      path: '/api/public/alert-deliver'
+      fullPath: '/api/public/alert-deliver'
+      preLoaderRoute: typeof ApiPublicAlertDeliverRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/industry/$name': {
       id: '/_authenticated/industry/$name'
@@ -266,9 +343,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
+  AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedLanesRoute: typeof AuthenticatedLanesRoute
   AuthenticatedPortfolioRoute: typeof AuthenticatedPortfolioRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedCommodityNameRoute: typeof AuthenticatedCommodityNameRoute
@@ -278,9 +358,12 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
+  AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedLanesRoute: AuthenticatedLanesRoute,
   AuthenticatedPortfolioRoute: AuthenticatedPortfolioRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedCommodityNameRoute: AuthenticatedCommodityNameRoute,
@@ -297,6 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicAlertDeliverRoute: ApiPublicAlertDeliverRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
