@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { ClipboardList, Trash2, History as HistoryIcon, Check, X as XIcon, Pencil } from "lucide-react";
+import { ClipboardList, Trash2, History as HistoryIcon, Check, X as XIcon, Pencil, RefreshCw, Plus } from "lucide-react";
 import { ops, useOps, tasksFor, auditFor, reviewsFor, fmtHrs, type TaskStatus } from "@/lib/ops-store";
 import type { EntityData } from "@/lib/entity.functions";
+import { TaskCreateModal } from "./TaskCreateModal";
 
 const STATUSES: TaskStatus[] = ["open", "in_progress", "blocked", "done"];
+const CYCLE: Record<TaskStatus, TaskStatus> = { open: "in_progress", in_progress: "done", blocked: "in_progress", done: "open" };
 
-export function OpsPanel({ entity, entityKey }: { entity: EntityData; entityKey: string }) {
+export function OpsPanel({ entity, entityKey, onRescore }: { entity: EntityData; entityKey: string; onRescore?: () => void }) {
   const state = useOps();
   const tasks = tasksFor(state, entityKey);
   const audit = auditFor(state, entityKey).slice(0, 25);
   const reviews = reviewsFor(state, entityKey);
-  const [title, setTitle] = useState("");
-  const [owner, setOwner] = useState("");
-  const [sla, setSla] = useState(72);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [rescorePromptId, setRescorePromptId] = useState<string | null>(null);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -20,55 +21,75 @@ export function OpsPanel({ entity, entityKey }: { entity: EntityData; entityKey:
         <div className="mb-3 flex items-center gap-2">
           <ClipboardList className="h-4 w-4 text-primary" />
           <h3 className="font-medium">Mitigation tasks</h3>
-          <span className="ml-auto text-xs text-muted-foreground">{tasks.filter((t) => t.status !== "done").length} open</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {tasks.filter((t) => t.status !== "done").length} open · {tasks.filter((t) => t.status !== "done" && t.dueAt < Date.now()).length} overdue
+          </span>
+          <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary">
+            <Plus className="h-3 w-3" /> New
+          </button>
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!title.trim() || !owner.trim()) return;
-            ops.addTask({ entityKey, title: title.trim(), owner: owner.trim(), status: "open", sla_hours: sla });
-            setTitle(""); setOwner("");
-          }}
-          className="mb-3 grid grid-cols-[1fr_140px_80px_auto] gap-1.5"
-        >
-          <input className="rounded-md border border-border bg-background px-2 py-1.5 text-sm" placeholder="Action / mitigation" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input className="rounded-md border border-border bg-background px-2 py-1.5 text-sm" placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
-          <input type="number" min={1} max={720} className="rounded-md border border-border bg-background px-2 py-1.5 text-sm tabular-nums" value={sla} onChange={(e) => setSla(Number(e.target.value) || 72)} />
-          <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">Add</button>
-        </form>
         {tasks.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No tasks yet. Use the mitigation engine below or add one above.</p>
+          <p className="text-xs text-muted-foreground">No tasks yet. Use the mitigation engine below or click "New" above.</p>
         ) : (
           <ul className="divide-y divide-border">
             {tasks.map((t) => {
               const remaining = t.dueAt - Date.now();
               const overdue = remaining < 0 && t.status !== "done";
               return (
-                <li key={t.id} className="grid grid-cols-[1fr_auto] gap-2 py-2 text-sm">
-                  <div>
-                    <div className="font-medium">{t.title}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {t.owner} · SLA {t.sla_hours}h · {t.status === "done" ? "done" : overdue ? <span className="text-rose-500">overdue {fmtHrs(-remaining)}</span> : `due in ${fmtHrs(remaining)}`}
-                      {t.riskTitle && <> · for "{t.riskTitle}"</>}
+                <li key={t.id} className="py-2 text-sm">
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div>
+                      <div className="font-medium">{t.title}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {t.owner} · due {new Date(t.dueAt).toLocaleDateString()} · {t.status === "done" ? <span className="text-emerald-500">done</span> : overdue ? <span className="text-rose-500">overdue {fmtHrs(-remaining)}</span> : `in ${fmtHrs(remaining)}`}
+                        {t.riskTitle && <> · for "{t.riskTitle}"</>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          const next = CYCLE[t.status];
+                          ops.updateTask(t.id, { status: next });
+                          if (next === "done") setRescorePromptId(t.id);
+                        }}
+                        className="rounded-md border border-border px-2 py-1 text-[11px] capitalize hover:border-primary hover:text-primary"
+                        title="Click to advance status"
+                      >
+                        {t.status.replace("_", " ")} →
+                      </button>
+                      <select
+                        value={t.status}
+                        onChange={(e) => {
+                          const next = e.target.value as TaskStatus;
+                          ops.updateTask(t.id, { status: next });
+                          if (next === "done") setRescorePromptId(t.id);
+                        }}
+                        className="rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+                      >
+                        {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <button onClick={() => ops.deleteTask(t.id)} className="text-muted-foreground hover:text-rose-500" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <select
-                      value={t.status}
-                      onChange={(e) => ops.updateTask(t.id, { status: e.target.value as TaskStatus })}
-                      className="rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-                    >
-                      {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <button onClick={() => ops.deleteTask(t.id)} className="text-muted-foreground hover:text-rose-500" title="Delete">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  {rescorePromptId === t.id && t.status === "done" && (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+                      <span>Re-score this entity to measure risk reduction?</span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => { setRescorePromptId(null); onRescore?.(); }} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-primary-foreground">
+                          <RefreshCw className="h-3 w-3" /> Re-score now
+                        </button>
+                        <button onClick={() => setRescorePromptId(null)} className="rounded-md border border-border px-2 py-1">Later</button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         )}
+        <TaskCreateModal open={modalOpen} onOpenChange={setModalOpen} entityKey={entityKey} />
       </div>
 
       <div className="rounded-lg border border-border bg-card p-5">

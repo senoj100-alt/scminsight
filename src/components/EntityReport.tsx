@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Globe2, Sparkles, Network, Route as RouteIcon, Activity, Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
 import { RiskMatrix } from "./RiskMatrix";
 import { SupplierNetwork } from "./SupplierNetwork";
@@ -16,8 +16,11 @@ import { OpsPanel } from "./OpsPanel";
 import { AlertsManager } from "./AlertsManager";
 import { ProvenancePanel } from "./ProvenancePanel";
 import { EntityChat } from "./EntityChat";
+import { Sparkline } from "./Sparkline";
+import { VelocityBadge } from "./VelocityBadge";
 import type { EntityData } from "@/lib/entity.functions";
 import { applyWeights, labelForScore, useUserSettings } from "@/lib/user-settings";
+import { scoreHistory, useScoreHistory, seriesFor, velocityFor } from "@/lib/score-history";
 
 function riskColor(score: number) {
   if (score >= 75) return "oklch(0.62 0.22 25)";
@@ -39,6 +42,16 @@ export function EntityReport({ entity, onRefresh, isRefreshing, lastFetchedAt }:
   const displayScore = weighted;
   const displayLabel = isCustom ? labelForScore(weighted) : e.overall_label;
   const color = riskColor(displayScore);
+
+  // Record the score every time a fresh report loads. Dedup logic lives in the store.
+  useEffect(() => {
+    scoreHistory.record({ entityKey, name: e.name, kind: e.kind, score: displayScore, overview: e.overview });
+    scoreHistory.markVisited(entityKey);
+  }, [entityKey, displayScore, e.name, e.kind, e.overview]);
+
+  const history = useScoreHistory();
+  const series = seriesFor(history, entityKey, 90).map((p) => p.score);
+  const velocity = velocityFor(history, entityKey, 30);
 
   const goCountry = (country: string) =>
     navigate({ to: "/country/$name", params: { name: encodeURIComponent(country) } });
@@ -70,11 +83,21 @@ export function EntityReport({ entity, onRefresh, isRefreshing, lastFetchedAt }:
           <div className="text-xs uppercase tracking-wider text-muted-foreground">
             Overall risk {isCustom && <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">custom weights</span>}
           </div>
-          <div className="mt-1 flex items-baseline justify-end gap-2">
-            <span className="text-3xl font-semibold tabular-nums" style={{ color }}>{displayScore}</span>
-            <span className="text-sm text-muted-foreground">/100</span>
+          <div className="mt-1 flex items-center justify-end gap-3">
+            {series.length >= 2 ? (
+              <Sparkline values={series} color={color} />
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Insufficient history</span>
+            )}
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums" style={{ color }}>{displayScore}</span>
+              <span className="text-sm text-muted-foreground">/100</span>
+            </div>
           </div>
-          <div className="mt-0.5 text-xs font-medium" style={{ color }}>{displayLabel}</div>
+          <div className="mt-1 flex items-center justify-end gap-2">
+            <div className="text-xs font-medium" style={{ color }}>{displayLabel}</div>
+            <VelocityBadge v={velocity} compact />
+          </div>
           {isCustom && (
             <div className="mt-0.5 text-[10px] text-muted-foreground">unweighted {e.overall_score}</div>
           )}
@@ -111,7 +134,7 @@ export function EntityReport({ entity, onRefresh, isRefreshing, lastFetchedAt }:
       <ProvenancePanel entity={e} lastFetchedAt={lastFetchedAt ?? Date.now()} />
       <AlertsManager entity={e} entityKey={entityKey} />
       <MitigationEngine entity={e} entityKey={entityKey} />
-      <OpsPanel entity={e} entityKey={entityKey} />
+      <OpsPanel entity={e} entityKey={entityKey} onRescore={onRefresh} />
 
       {e.kind === "company" && e.countries_of_operation && e.countries_of_operation.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-5">

@@ -3,8 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { listHistory } from "@/lib/history.functions";
 import { useAuth } from "@/lib/auth";
-import { Activity, AlertTriangle, DollarSign, Truck, FileText, LogIn, TrendingDown } from "lucide-react";
+import { Activity, AlertTriangle, DollarSign, Truck, FileText, LogIn, TrendingDown, ClipboardList } from "lucide-react";
 import { useMemo } from "react";
+import { useScoreHistory, latestFor, velocityFor } from "@/lib/score-history";
+import { useOps } from "@/lib/ops-store";
+import { VelocityBadge } from "@/components/VelocityBadge";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({
@@ -50,8 +53,18 @@ function AnalyticsPage() {
   const { user } = useAuth();
   const list = useServerFn(listHistory);
   const { data, isLoading } = useQuery({ queryKey: ["history"], queryFn: () => list(), enabled: !!user });
+  const history = useScoreHistory();
+  const opsState = useOps();
 
-  const rows = (data ?? []) as Row[];
+  const rawRows = (data ?? []) as Row[];
+  // merge live monitored scores
+  const rows: Row[] = rawRows.map((r) => {
+    const live = latestFor(history, `${r.kind}:${r.commodity}`);
+    return live ? { ...r, risk_score: live.score } : r;
+  });
+
+  const openTasks = opsState.tasks.filter((t) => t.status !== "done").length;
+  const overdueTasks = opsState.tasks.filter((t) => t.status !== "done" && t.dueAt < Date.now()).length;
 
   const stats = useMemo(() => {
     const companies = rows.filter((r) => r.kind === "company");
@@ -115,6 +128,11 @@ function AnalyticsPage() {
         <Kpi icon={AlertTriangle} label="Red entities" value={String(rows.filter((r) => r.risk_score >= 75).length)} sub="risk score ≥ 75" tone="oklch(0.62 0.22 25)" />
       </div>
 
+      <div className="grid gap-3 md:grid-cols-2">
+        <Kpi icon={ClipboardList} label="Open mitigation tasks" value={String(openTasks)} sub="across all entities" />
+        <Kpi icon={AlertTriangle} label="Overdue tasks" value={String(overdueTasks)} sub="past due date" tone={overdueTasks > 0 ? "oklch(0.62 0.22 25)" : undefined} />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel icon={AlertTriangle} title="Risky companies" subtitle="Highest current risk score among tracked suppliers">
           {stats.riskyCompanies.length === 0 ? (
@@ -167,6 +185,7 @@ function AnalyticsPage() {
                 <th className="py-2 text-right font-medium">PO value</th>
                 <th className="py-2 text-right font-medium">Days to ship</th>
                 <th className="py-2 text-right font-medium">Risk</th>
+                <th className="py-2 text-left font-medium">Trend</th>
                 <th className="py-2 text-right font-medium">Revenue at risk</th>
               </tr>
             </thead>
@@ -195,6 +214,7 @@ function AnalyticsPage() {
                   <td className="py-2 text-right tabular-nums">{fmtUsd(r.value)}</td>
                   <td className="py-2 text-right tabular-nums">{r.days}d</td>
                   <td className="py-2 text-right"><Score n={r.risk} compact /></td>
+                  <td className="py-2"><VelocityBadge v={velocityFor(history, `${r.kind}:${r.commodity}`, 30)} compact /></td>
                   <td className="py-2 text-right tabular-nums font-medium" style={{ color: r.risk >= 60 ? "oklch(0.62 0.22 25)" : undefined }}>
                     {fmtUsd(r.value * (r.risk / 100))}
                   </td>

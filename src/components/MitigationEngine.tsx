@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Wrench, ArrowRight } from "lucide-react";
 import type { EntityData } from "@/lib/entity.functions";
-import { ops } from "@/lib/ops-store";
+import { TaskCreateModal } from "./TaskCreateModal";
 
 type Action = {
   title: string;
@@ -47,6 +48,7 @@ function buildActions(e: EntityData): Action[] {
 
 export function MitigationEngine({ entity, entityKey }: { entity: EntityData; entityKey: string }) {
   const actions = buildActions(entity);
+  const [modal, setModal] = useState<null | { title: string; riskTitle: string; mitigation: string }>(null);
   if (!actions.length) return null;
   return (
     <div className="rounded-lg border border-border bg-card p-5">
@@ -83,7 +85,7 @@ export function MitigationEngine({ entity, entityKey }: { entity: EntityData; en
                 </td>
                 <td className="py-2 text-right">
                   <button
-                    onClick={() => ops.addTask({ entityKey, title: a.title, owner: "unassigned", status: "open", sla_hours: 72, mitigation: a.title, riskTitle: a.riskTitle })}
+                    onClick={() => setModal({ title: a.title, riskTitle: a.riskTitle, mitigation: a.title })}
                     className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary hover:text-primary"
                   >
                     Create task <ArrowRight className="h-3 w-3" />
@@ -94,6 +96,14 @@ export function MitigationEngine({ entity, entityKey }: { entity: EntityData; en
           </tbody>
         </table>
       </div>
+      <TaskCreateModal
+        open={!!modal}
+        onOpenChange={(o) => { if (!o) setModal(null); }}
+        entityKey={entityKey}
+        defaultTitle={modal?.title ?? ""}
+        defaultRiskTitle={modal?.riskTitle}
+        defaultMitigation={modal?.mitigation}
+      />
     </div>
   );
 }

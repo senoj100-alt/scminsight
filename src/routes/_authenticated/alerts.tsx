@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Bell, Trash2, Slack, Mail, AlertTriangle, Plus } from "lucide-react";
+import { Bell, Trash2, Slack, Mail, AlertTriangle, Plus, Activity } from "lucide-react";
 import { useState } from "react";
 import { useOps, ops } from "@/lib/ops-store";
+import { useScoreHistory, systemScoreAlerts } from "@/lib/score-history";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
   head: () => ({
@@ -15,6 +16,8 @@ export const Route = createFileRoute("/_authenticated/alerts")({
 
 function AlertsPage() {
   const state = useOps();
+  const history = useScoreHistory();
+  const sysAlerts = systemScoreAlerts(history, 5);
   const [entity, setEntity] = useState("");
   const [threshold, setThreshold] = useState(75);
   const [channel, setChannel] = useState<"in_app" | "email" | "slack">("in_app");
@@ -48,6 +51,38 @@ function AlertsPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Fire in-app, Slack or email alerts when risk crosses your thresholds. Entity-scoped alerts also live on each report page.
         </p>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <Activity className="h-4 w-4 text-primary" /> System score-change alerts
+          <span className="ml-auto text-xs text-muted-foreground">auto-fires when an entity moves ≥5 pts between refreshes</span>
+        </div>
+        {sysAlerts.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No score-change events yet. Re-analyze entities — once two snapshots differ by 5+ points an alert appears here.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {sysAlerts.slice(0, 10).map((a) => {
+              const up = a.delta > 0;
+              const color = up ? "oklch(0.62 0.22 25)" : "oklch(0.72 0.17 145)";
+              return (
+                <li key={a.id} className="flex items-center justify-between py-2 text-sm">
+                  <div>
+                    <span className="font-medium">{a.name}</span>
+                    <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground">{a.kind}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{a.from} → {a.to}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ color, background: color.replace(")", " / 0.12)") }}>
+                      {up ? "↑ +" : "↓ "}{a.delta}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{new Date(a.ts).toLocaleString()}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-card p-5">
