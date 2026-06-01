@@ -16,6 +16,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
 import { Route as AuthenticatedLanesRouteImport } from './routes/_authenticated/lanes'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedDigestRouteImport } from './routes/_authenticated/digest'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
@@ -58,6 +59,11 @@ const AuthenticatedLanesRoute = AuthenticatedLanesRouteImport.update({
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDigestRoute = AuthenticatedDigestRouteImport.update({
+  id: '/digest',
+  path: '/digest',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/digest': typeof AuthenticatedDigestRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/lanes': typeof AuthenticatedLanesRoute
   '/portfolio': typeof AuthenticatedPortfolioRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/digest': typeof AuthenticatedDigestRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/lanes': typeof AuthenticatedLanesRoute
   '/portfolio': typeof AuthenticatedPortfolioRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/digest': typeof AuthenticatedDigestRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/lanes': typeof AuthenticatedLanesRoute
   '/_authenticated/portfolio': typeof AuthenticatedPortfolioRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/backtest'
     | '/dashboard'
+    | '/digest'
     | '/history'
     | '/lanes'
     | '/portfolio'
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/backtest'
     | '/dashboard'
+    | '/digest'
     | '/history'
     | '/lanes'
     | '/portfolio'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics'
     | '/_authenticated/backtest'
     | '/_authenticated/dashboard'
+    | '/_authenticated/digest'
     | '/_authenticated/history'
     | '/_authenticated/lanes'
     | '/_authenticated/portfolio'
@@ -274,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/digest': {
+      id: '/_authenticated/digest'
+      path: '/digest'
+      fullPath: '/digest'
+      preLoaderRoute: typeof AuthenticatedDigestRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -347,6 +366,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDigestRoute: typeof AuthenticatedDigestRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLanesRoute: typeof AuthenticatedLanesRoute
   AuthenticatedPortfolioRoute: typeof AuthenticatedPortfolioRoute
@@ -362,6 +382,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDigestRoute: AuthenticatedDigestRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLanesRoute: AuthenticatedLanesRoute,
   AuthenticatedPortfolioRoute: AuthenticatedPortfolioRoute,
