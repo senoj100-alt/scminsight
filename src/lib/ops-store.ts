@@ -126,12 +126,19 @@ export function useOps() {
 
 // ===== Mutators =====
 export const ops = {
-  addTask(t: Omit<Task, "id" | "createdAt" | "dueAt"> & { sla_hours: number }) {
+  addTask(
+    t: Omit<Task, "id" | "createdAt" | "dueAt" | "sla_hours"> & {
+      sla_hours?: number;
+      dueAt?: number;
+    }
+  ) {
     const s = read();
     const createdAt = Date.now();
-    const task: Task = { ...t, id: uid(), createdAt, dueAt: createdAt + t.sla_hours * 3600_000 };
+    const sla_hours = t.sla_hours ?? (t.dueAt ? Math.max(1, Math.round((t.dueAt - createdAt) / 3600_000)) : 72);
+    const dueAt = t.dueAt ?? createdAt + sla_hours * 3600_000;
+    const task: Task = { ...t, sla_hours, id: uid(), createdAt, dueAt };
     write({ ...s, tasks: [task, ...s.tasks] });
-    ops.audit(t.entityKey, "task.created", `${t.title} → ${t.owner} (${t.sla_hours}h SLA)`);
+    ops.audit(t.entityKey, "task.created", `${t.title} → ${t.owner} (due ${new Date(dueAt).toLocaleDateString()})`);
     return task;
   },
   updateTask(id: string, patch: Partial<Task>) {
