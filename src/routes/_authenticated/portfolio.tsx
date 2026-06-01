@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { listHistory } from "@/lib/history.functions";
 import { LayoutGrid, AlertTriangle, ShieldCheck, ShieldAlert, Activity, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useScoreHistory, latestFor, velocityFor, deltaSinceLastVisit, scoreHistory } from "@/lib/score-history";
+import { VelocityBadge, DeltaSinceVisit } from "@/components/VelocityBadge";
 
 export const Route = createFileRoute("/_authenticated/portfolio")({
   component: PortfolioPage,
@@ -23,28 +26,45 @@ function routeFor(kind: string) {
   return "/commodity/$name" as const;
 }
 
+type Row = { id: string; commodity: string; kind: string; risk_score: number; risk_label: string; created_at: string };
+
 function PortfolioPage() {
   const { user } = useAuth();
   const list = useServerFn(listHistory);
   const { data, isLoading } = useQuery({ queryKey: ["history"], queryFn: () => list(), enabled: !!user });
+  const history = useScoreHistory();
 
-  const groups = ((data ?? []) as { id: string; commodity: string; kind: string; risk_score: number; risk_label: string; created_at: string }[]).reduce<Record<string, typeof data>>((acc, r) => {
+  // Merge stored history latest scores into the rows for live monitoring
+  const rows: Row[] = ((data ?? []) as Row[]).map((r) => {
+    const key = `${r.kind}:${r.commodity}`;
+    const live = latestFor(history, key);
+    return live ? { ...r, risk_score: live.score } : r;
+  });
+
+  // Mark visited AFTER reading deltas so user sees them at least once.
+  useEffect(() => {
+    return () => {
+      scoreHistory.markPortfolioVisited();
+    };
+  }, []);
+
+  const groups = rows.reduce<Record<string, Row[]>>((acc, r) => {
     const k = r.kind ?? "commodity";
-    (acc[k] ||= [] as never).push(r as never);
+    (acc[k] ||= []).push(r);
     return acc;
   }, {});
 
-  const totalCount = data?.length ?? 0;
-  const redCount = (data ?? []).filter((r) => r.risk_score >= 75).length;
-  const amberCount = (data ?? []).filter((r) => r.risk_score >= 55 && r.risk_score < 75).length;
-  const greenCount = (data ?? []).filter((r) => r.risk_score < 35).length;
+  const totalCount = rows.length;
+  const redCount = rows.filter((r) => r.risk_score >= 75).length;
+  const amberCount = rows.filter((r) => r.risk_score >= 55 && r.risk_score < 75).length;
+  const greenCount = rows.filter((r) => r.risk_score < 35).length;
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm uppercase tracking-widest text-primary">Command centre</p>
         <h1 className="mt-1 text-3xl font-semibold">Portfolio risk heatmap</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Every entity you've analyzed, grouped and color-coded by current risk score.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Every entity you've analyzed, scored live from your monitoring history.</p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -73,12 +93,15 @@ function PortfolioPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groups).map(([kind, rows]) => (
+          {Object.entries(groups).map(([kind, list]) => (
             <div key={kind}>
-              <h2 className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">{kind} ({rows!.length})</h2>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {rows!.map((r) => {
+              <h2 className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">{kind} ({list.length})</h2>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {list.map((r) => {
                   const c = rag(r.risk_score);
+                  const key = `${r.kind}:${r.commodity}`;
+                  const vel = velocityFor(history, key, 30);
+                  const delta = deltaSinceLastVisit(history, key);
                   return (
                     <Link
                       key={r.id}
@@ -96,6 +119,10 @@ function PortfolioPage() {
                           <div className="text-lg font-semibold tabular-nums" style={{ color: c.color }}>{r.risk_score}</div>
                           <div className="text-[10px] uppercase tracking-wider" style={{ color: c.color }}>{c.label}</div>
                         </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <VelocityBadge v={vel} compact />
+                        {delta && <DeltaSinceVisit delta={delta.delta} />}
                       </div>
                     </Link>
                   );
